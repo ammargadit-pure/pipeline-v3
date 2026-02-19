@@ -1,0 +1,25 @@
+{
+    "agent": {
+        "node_identifier": "hpc-primary-001",
+        "hardware_revision": "rev-B",
+        "architecture": "x86_64",
+        "os_type": "linux",
+        "region": "EU",
+        "install_base_dir": "/tmp/ota-test/opt",
+        "state_file": "/tmp/ota-test/agent-state.json",
+        "log_level": "debug",
+        "log_file": "/tmp/ota-test/log/agent.log"
+    },
+    "master": {
+        "address": "/tmp/ota-test/master.sock",
+        "transport": "unix"
+    },
+    "heartbeat": {
+        "interval_seconds": 2,
+        "timeout_seconds": 6
+    },
+    "bootloader": {
+        "plugin": "sim",
+        "config": {}
+    }
+}
