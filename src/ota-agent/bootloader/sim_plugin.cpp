@@ -166,6 +166,14 @@ static std::string parse_base_dir(const char *config_json) {
 }
 
 static void ensure_dir(const char *path) {
+    std::string p(path);
+    for (size_t i = 1; i < p.size(); ++i) {
+        if (p[i] == '/') {
+            p[i] = '\0';
+            mkdir(p.c_str(), 0755);
+            p[i] = '/';
+        }
+    }
     mkdir(path, 0755);
 }
 

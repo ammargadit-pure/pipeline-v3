@@ -15,7 +15,8 @@ protected:
     void SetUp() override {
         std::string rm_cmd = std::string("rm -rf ") + TEST_FACTORY_BASE_DIR;
         system(rm_cmd.c_str());
-        mkdir(TEST_FACTORY_BASE_DIR, 0755);
+        std::string mk_cmd = std::string("mkdir -p ") + TEST_FACTORY_BASE_DIR;
+        system(mk_cmd.c_str());
     }
 
     void TearDown() override {

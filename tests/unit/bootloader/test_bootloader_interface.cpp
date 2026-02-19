@@ -19,10 +19,11 @@ protected:
     ota_bootloader_interface_t *iface = nullptr;
 
     void SetUp() override {
-        /* Clean up and create test directory */
+        /* Clean up and create test directory (with parents) */
         std::string rm_cmd = std::string("rm -rf ") + TEST_SIM_BASE_DIR;
         system(rm_cmd.c_str());
-        mkdir(TEST_SIM_BASE_DIR, 0755);
+        std::string mk_cmd = std::string("mkdir -p ") + TEST_SIM_BASE_DIR;
+        system(mk_cmd.c_str());
 
         std::string config = std::string(R"({"base_dir": ")") + TEST_SIM_BASE_DIR + R"("})";
         iface = ota_bootloader_create(OTA_BOOTLOADER_PLUGIN_SIM, config.c_str());
