@@ -71,13 +71,13 @@
           "title": "Write + run ALL libota-core unit tests — MUST ALL PASS",
           "description": "Write comprehensive unit tests for every libota-core module. This is the QUALITY GATE — nothing else proceeds until these all pass.\n\nTest files to create/complete in tests/unit/core/:\n\n1. test_error.cpp — TEST(Error, ...):\n   - ErrorStrReturnsStringForAllCodes\n   - ErrorStrReturnsUnknownForInvalid\n   - RangeCheckProtocol, RangeCheckVerify, RangeCheckAllCategories\n   See test-strategy.md 'Module: libota-core → test_error.cpp'\n\n2. test_manifest.cpp — TEST(Manifest, ...):\n   - ParseValidSwManifest, ParseValidFwManifest\n   - ParseMissingRequiredField, ParseEmptyJson, ParseNullJson, ParseMalformedJson\n   - ValidateCompleteManifest, ValidateEmptyPackageId, ValidateEmptyVersion\n   - SerializeRoundtrip, FreeDoubleFreeIsSafe\n   See test-strategy.md for full list\n\n3. test_protocol.cpp — TEST(Protocol, ...):\n   - HeaderSerializeDeserializeRoundtrip, HeaderNetworkByteOrder\n   - HeaderValidateBadMagic, HeaderValidateBadVersion, HeaderValidateOversizedPayload\n   - MsgIsBinaryTransferData, MsgIsNotBinaryForOthers, MsgTypeStrReturnsNonNull\n\n4. test_state.cpp — TEST(State, ...):\n   - CampaignStateStrRoundtrip, TargetStateStrRoundtrip, MilestoneStrRoundtrip, DownloadStateStrRoundtrip\n   - CampaignValidTransitions, CampaignInvalidTransitions\n   - TargetValidTransitions, TargetInvalidTransitions\n\n5. test_version.cpp — TEST(Version, ...):\n   - ParseValidVersion, ParseInvalid, ParseEmpty\n   - CompareGreater, CompareEqual, CompareLess, ComparePatchLevel\n   - InRangeTrue, InRangeFalse, InRangeBoundaryMin, InRangeBoundaryMax\n   - ToStrRoundtrip\n\n6. test_crypto.cpp — TEST(Crypto, ...):\n   - Crc32KnownValue (0xCBF43926 for '123456789'), Crc32Empty, Crc32Incremental\n   - Sha256KnownValue, Sha256Empty, Sha256Incremental, Sha256FileMatchesBuffer\n   - Sha256ToHex, Sha256HexMatches, Sha256HexMismatch\n   - EcdsaSignVerifyRoundtrip, EcdsaVerifyBadSignature, EcdsaVerifyWrongKey, EcdsaVerifyNonexistentKey\n   Uses test keys from tests/fixtures/keys/\n\nRULES:\n   - Every test has >= 2 meaningful assertions\n   - No GTEST_SKIP or DISABLED_\n   - No mocks (these are real unit tests of C functions)\n   - Use test data constants from shared-contracts.md §16\n\nAcceptance criteria:\n   cmake --build build -j$(nproc)\n   cd build && ctest -R '^unit_core_' --output-on-failure  → ALL PASS, EXIT 0\n   No warnings in build output\n\nREFERENCE: test-strategy.md 'Module: libota-core' for complete test list with assertions.\nREFERENCE: shared-contracts.md §16 for test data constants.\nREFERENCE: verification-plan.md 'Module: libota-core' for verification commands.",
           "skill": "develop",
-          "status": "dev_complete",
+          "status": "complete",
           "blockedBy": [
             "found-001"
           ],
           "attempts": 3,
           "passes": true,
-          "resolved_at": "2026-02-20T04:00:00Z"
+          "resolved_at": "2026-02-19T23:13:53Z"
         }
       ]
     },
