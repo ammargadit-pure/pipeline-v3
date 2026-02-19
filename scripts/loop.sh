@@ -48,13 +48,18 @@ CRITICAL RULES:
 2. Read phase-plan.json — find your task '${TASK_ID}'.
 3. Run: git log --oneline -10 to see what exists.
 4. Follow .claude/skills/${SKILL}/SKILL.md step by step.
-5. Run validation: $CMD_TYPECHECK && $CMD_TEST (see CLAUDE.md for your stack's commands)
+5. Run the validation commands defined in CLAUDE.md (typecheck + tests).
 6. Do NOT consider yourself done unless BOTH commands exit with code 0.
 7. Do NOT use test.skip(). Do NOT use mocks outside tests/unit/.
 8. Follow shared-contracts.md EXACTLY. Do NOT invent new names.
 9. When done, update phase-plan.json: set '${TASK_ID}' status to 'dev_complete'.
 10. Append learnings to working-memory.md.
 11. Also write learnings to runs/ folder if it exists: runs/*-${TASK_ID}/learnings.md"
+
+# Write prompt to temp file to avoid shell parsing issues
+PROMPT_FILE=$(mktemp)
+echo "$PROMPT" > "$PROMPT_FILE"
+trap "rm -f '$PROMPT_FILE'" EXIT
 
 for ITERATION in $(seq 1 "$MAX_ITERATIONS"); do
   echo ""
@@ -63,7 +68,7 @@ for ITERATION in $(seq 1 "$MAX_ITERATIONS"); do
   set +e
   # Wall-clock timeout: kill agent if single iteration exceeds 10 minutes
   ITER_TIMEOUT="${ITER_TIMEOUT:-600}"
-  timeout "$ITER_TIMEOUT" bash -c "echo '$PROMPT' | claude --print --dangerously-skip-permissions --output-format json --max-turns 20 2>&1" | tee -a "$LOG_FILE"
+  timeout "$ITER_TIMEOUT" sh -c 'cat "$1" | claude --print --dangerously-skip-permissions --output-format json --max-turns 20 2>&1' _ "$PROMPT_FILE" | tee -a "$LOG_FILE"
   AGENT_EXIT=$?
   set -e
 
