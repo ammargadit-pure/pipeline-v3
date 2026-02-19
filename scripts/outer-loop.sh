@@ -158,6 +158,11 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
     fi
   done
 
+  # Commit any status changes to avoid merge conflicts
+  if ! git diff --quiet "$PLAN_FILE" 2>/dev/null; then
+    git add "$PLAN_FILE" && git commit -m "chore: sync task status from worktrees" 2>/dev/null || true
+  fi
+
   sleep 2
 done
 
