@@ -20,7 +20,7 @@
           "title": "Install system dependencies (apt packages)",
           "description": "Install required system libraries:\n  sudo apt install -y libcurl4-openssl-dev libarchive-dev\nOptionally: sudo apt install -y gcovr valgrind clang-tidy\n\nVerification:\n  pkg-config --exists libcurl && echo OK\n  pkg-config --exists libarchive && echo OK\n\nSee test-strategy.md 'Needs Installation Before Development' section.\nThis task BLOCKS all C/C++ builds that link libcurl (Master cloud client, download manager) or libarchive (ota-pack, agent installer).",
           "skill": "develop",
-          "status": "pending",
+          "status": "complete",
           "blockedBy": [],
           "attempts": 0,
           "passes": false
@@ -30,7 +30,7 @@
           "title": "Generate ECDSA P-256 test keypair",
           "description": "Generate test signing keys for package verification:\n  mkdir -p tests/fixtures/keys\n  openssl ecparam -name prime256v1 -genkey -noout -out tests/fixtures/keys/test_private.pem\n  openssl ec -in tests/fixtures/keys/test_private.pem -pubout -out tests/fixtures/keys/test_public.pem\n\nVerification:\n  openssl ec -in tests/fixtures/keys/test_private.pem -check -noout\n  openssl ec -in tests/fixtures/keys/test_public.pem -pubin -text -noout\n\nSee test-strategy.md Tier 4: infra-test-keys.\nBLOCKS: ALL crypto tests, ALL verification tests, ALL signing tests, test fixture package generation.",
           "skill": "develop",
-          "status": "pending",
+          "status": "complete",
           "blockedBy": [],
           "attempts": 0,
           "passes": false
@@ -57,7 +57,11 @@
           "description": "Create the entire build system and the libota-core shared library.\n\nFiles to create:\n\n1. Root CMakeLists.txt:\n   - cmake_minimum_required(VERSION 3.20)\n   - project(ota-system LANGUAGES C CXX)\n   - C standard 11, CXX standard 17\n   - FetchContent for: GoogleTest, nlohmann-json, cJSON, spdlog\n   - Options: OTA_BUILD_TESTS, OTA_BUILD_MOCK_CLOUD, OTA_COVERAGE\n   - add_subdirectory for each src/ component\n   - Conditional test directory inclusion\n\n2. cmake/CompilerFlags.cmake:\n   - -Wall -Wextra -Werror -Wpedantic\n   - -fsanitize=address,undefined for Debug builds\n\n3. cmake/Dependencies.cmake:\n   - FetchContent_Declare for GoogleTest 1.13+, nlohmann-json 3.11+, cJSON 1.7+, spdlog 1.11+\n\n4. cmake/Testing.cmake:\n   - enable_testing(), CTest configuration\n   - Coverage flags if OTA_COVERAGE=ON\n\n5. src/libota-core/CMakeLists.txt:\n   - Static library target 'ota-core'\n   - Include directory: include/\n   - Link: OpenSSL::SSL OpenSSL::Crypto, cJSON\n   - Install headers under ota/core/ and ota/bootloader/\n\n6. ALL headers in src/libota-core/include/ota/core/:\n   - types.h — EXACT content from shared-contracts.md §3\n   - error.h — EXACT content from shared-contracts.md §4\n   - protocol.h — EXACT content from shared-contracts.md §5\n   - state.h — EXACT content from shared-contracts.md §6\n   - manifest.h — EXACT content from shared-contracts.md §7\n   - version.h — EXACT content from shared-contracts.md §8\n   - crypto.h — EXACT content from shared-contracts.md §9\n   - persistence.h — EXACT content from shared-contracts.md §10\n\n7. Header in src/libota-core/include/ota/bootloader/:\n   - interface.h — EXACT content from shared-contracts.md §11\n\n8. ALL source files in src/libota-core/src/:\n   - error.c — ota_error_str() switch for ALL enum values, range check inlines\n   - manifest.c — parse (cJSON), validate, serialize, free\n   - protocol.c — header serialize/deserialize (htons/htonl), validate, msg_is_binary, msg_type_str\n   - state.c — ALL str/from_str functions, can_transition lookup tables\n   - version.c — parse MAJOR.MINOR.PATCH, compare, in_range, to_str\n   - crypto_openssl.c — CRC32 (zlib polynomial), SHA-256 (EVP API), ECDSA P-256 sign/verify (EVP_DigestSign/Verify)\n   - persistence.c — atomic_write (write tmp, fsync, rename), read_file, file_exists, mkdir_p\n\n9. Test scaffolding:\n   - tests/unit/core/CMakeLists.txt — unit_core_tests executable linking ota-core + GTest\n   - Stub test files (test_error.cpp, test_manifest.cpp, etc.) — just enough to compile+link\n\nAcceptance criteria:\n   cmake -B build -DCMAKE_BUILD_TYPE=Debug -DOTA_BUILD_TESTS=ON\n   cmake --build build --target ota-core -j$(nproc)  → EXIT 0, zero warnings\n   test -f build/src/libota-core/libota-core.a\n   All headers compilable with: gcc -c test.c -I src/libota-core/include\n\nREFERENCE: shared-contracts.md §§2-11 for every identifier, type, and function signature.\nREFERENCE: tech-spec.md §§1,2,7 for file structure and error codes.\nREFERENCE: verification-plan.md 'Module: libota-core' for build verification commands.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["infra-001", "infra-002", "infra-003"],
+          "blockedBy": [
+            "infra-001",
+            "infra-002",
+            "infra-003"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -67,7 +71,9 @@
           "description": "Write comprehensive unit tests for every libota-core module. This is the QUALITY GATE — nothing else proceeds until these all pass.\n\nTest files to create/complete in tests/unit/core/:\n\n1. test_error.cpp — TEST(Error, ...):\n   - ErrorStrReturnsStringForAllCodes\n   - ErrorStrReturnsUnknownForInvalid\n   - RangeCheckProtocol, RangeCheckVerify, RangeCheckAllCategories\n   See test-strategy.md 'Module: libota-core → test_error.cpp'\n\n2. test_manifest.cpp — TEST(Manifest, ...):\n   - ParseValidSwManifest, ParseValidFwManifest\n   - ParseMissingRequiredField, ParseEmptyJson, ParseNullJson, ParseMalformedJson\n   - ValidateCompleteManifest, ValidateEmptyPackageId, ValidateEmptyVersion\n   - SerializeRoundtrip, FreeDoubleFreeIsSafe\n   See test-strategy.md for full list\n\n3. test_protocol.cpp — TEST(Protocol, ...):\n   - HeaderSerializeDeserializeRoundtrip, HeaderNetworkByteOrder\n   - HeaderValidateBadMagic, HeaderValidateBadVersion, HeaderValidateOversizedPayload\n   - MsgIsBinaryTransferData, MsgIsNotBinaryForOthers, MsgTypeStrReturnsNonNull\n\n4. test_state.cpp — TEST(State, ...):\n   - CampaignStateStrRoundtrip, TargetStateStrRoundtrip, MilestoneStrRoundtrip, DownloadStateStrRoundtrip\n   - CampaignValidTransitions, CampaignInvalidTransitions\n   - TargetValidTransitions, TargetInvalidTransitions\n\n5. test_version.cpp — TEST(Version, ...):\n   - ParseValidVersion, ParseInvalid, ParseEmpty\n   - CompareGreater, CompareEqual, CompareLess, ComparePatchLevel\n   - InRangeTrue, InRangeFalse, InRangeBoundaryMin, InRangeBoundaryMax\n   - ToStrRoundtrip\n\n6. test_crypto.cpp — TEST(Crypto, ...):\n   - Crc32KnownValue (0xCBF43926 for '123456789'), Crc32Empty, Crc32Incremental\n   - Sha256KnownValue, Sha256Empty, Sha256Incremental, Sha256FileMatchesBuffer\n   - Sha256ToHex, Sha256HexMatches, Sha256HexMismatch\n   - EcdsaSignVerifyRoundtrip, EcdsaVerifyBadSignature, EcdsaVerifyWrongKey, EcdsaVerifyNonexistentKey\n   Uses test keys from tests/fixtures/keys/\n\nRULES:\n   - Every test has >= 2 meaningful assertions\n   - No GTEST_SKIP or DISABLED_\n   - No mocks (these are real unit tests of C functions)\n   - Use test data constants from shared-contracts.md §16\n\nAcceptance criteria:\n   cmake --build build -j$(nproc)\n   cd build && ctest -R '^unit_core_' --output-on-failure  → ALL PASS, EXIT 0\n   No warnings in build output\n\nREFERENCE: test-strategy.md 'Module: libota-core' for complete test list with assertions.\nREFERENCE: shared-contracts.md §16 for test data constants.\nREFERENCE: verification-plan.md 'Module: libota-core' for verification commands.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["found-001"],
+          "blockedBy": [
+            "found-001"
+          ],
           "attempts": 0,
           "passes": false
         }
@@ -83,7 +89,9 @@
           "description": "Create the bootloader plugin layer that both Linux and FreeRTOS agents depend on.\n\nFiles to create:\n\n1. src/libota-core/include/ota/bootloader/interface.h — Already created in found-001. Verify it matches shared-contracts.md §11 EXACTLY.\n\n2. src/ota-agent/bootloader/plugin_factory.hpp + plugin_factory.cpp:\n   - namespace ota::agent\n   - ota_bootloader_create(plugin_name, config_json) → allocates and returns plugin\n   - ota_bootloader_destroy(iface) → frees plugin\n   - Supports plugin names: 'sim', 'linux-generic' (shared-contracts.md §11 constants)\n   - Unknown plugin → returns nullptr\n\n3. src/ota-agent/bootloader/sim_plugin.cpp:\n   - Simulates A/B flash slots using temp files\n   - detect_inactive_slot: returns slot_b if slot_a active (and vice versa)\n   - stage_firmware: writes data to file at offset\n   - prepare_activation: marks staged slot as pending\n   - query_boot_status: returns both slots' states\n   - mark_active_valid: clears pending_activation\n   - mark_slot_invalid: sets is_valid=false on specified slot\n   - Context struct holds file paths for slot_a and slot_b (from config_json)\n\n4. src/ota-agent/bootloader/linux_generic_plugin.cpp:\n   - Similar to sim but uses partition metadata files\n   - For x86 dev: reads/writes JSON metadata files (simulating UBoot env vars)\n\n5. src/ota-agent/CMakeLists.txt — Add bootloader sources, create bootloader sub-target or include in agent build\n\n6. tests/unit/bootloader/CMakeLists.txt — unit_bootloader_tests executable\n\nAcceptance criteria:\n   cmake --build build --target ota-agent -j$(nproc)  → compiles (may not fully link yet, bootloader is a sub-component)\n   Bootloader plugin files compile without errors\n\nREFERENCE: shared-contracts.md §11 for interface, plugin names, factory signatures.\nREFERENCE: tech-spec.md §9 for bootloader plugin interface.\nREFERENCE: tech-spec.md §6 for bootloader config keys (agent.bootloader.plugin, agent.bootloader.config).",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-found-001"],
+          "blockedBy": [
+            "test-found-001"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -93,7 +101,9 @@
           "description": "Write and run unit tests for bootloader plugins.\n\nTest files:\n\n1. tests/unit/bootloader/test_bootloader_interface.cpp — TEST(BootloaderPlugin, ...):\n   - SimDetectInactiveSlotB: Slot A active → returns slot B (slot_index=1, label='slot_b')\n   - SimDetectInactiveSlotA: Slot B active → returns slot A\n   - SimStageFirmware: Write data → prepare_activation → pending_activation=true\n   - SimMarkActiveValid: Clears pending_activation\n   - SimMarkSlotInvalid: Slot is_valid becomes false\n   - SimQueryBootStatus: Returns correct active/inactive slots\n   - SimBootCountTracking: boot_count increments after simulated reboot\n\n2. tests/unit/bootloader/test_plugin_factory.cpp — TEST(PluginFactory, ...):\n   - CreateSimPlugin: ota_bootloader_create('sim', config) → non-null, name=='sim'\n   - CreateLinuxGenericPlugin: ota_bootloader_create('linux-generic', config) → non-null\n   - CreateUnknownPlugin: ota_bootloader_create('unknown', config) → null\n   - DestroyNullIsSafe: ota_bootloader_destroy(NULL) → no crash\n\nRULES: >= 2 assertions per test, no skips, no mocks\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_bootloader_' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Module: Bootloader Plugins'.\nREFERENCE: shared-contracts.md §11 for plugin names and interface.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-001"],
+          "blockedBy": [
+            "build-001"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -103,7 +113,9 @@
           "description": "Create the foundational Master modules that all other Master modules depend on.\n\nFiles to create:\n\nNamespace: ota::master\n\n1. src/ota-master/CMakeLists.txt:\n   - Executable target 'ota-master'\n   - Links: ota-core, nlohmann_json, spdlog, sqlite3, (libcurl and libarchive added later)\n   - Include dirs for master headers\n\n2. src/ota-master/db/database.hpp + database.cpp:\n   - class Database\n   - Constructor takes db_path, opens/creates SQLite file\n   - initSchema() — runs ALL CREATE TABLE + CREATE INDEX from shared-contracts.md §12 EXACTLY\n   - CRUD methods for agents, campaigns, campaign_targets, downloads, audit_log\n   - Transaction support: begin(), commit(), rollback()\n   - Prepared statement caching\n   - All column names match shared-contracts.md §12 exactly\n\n3. src/ota-master/config/config.hpp + config.cpp:\n   - class Config\n   - load(path) — parse JSON, validate required fields\n   - All config keys from shared-contracts.md §14 (master section)\n   - Getters for each field with correct types\n   - Default values for optional fields\n\n4. src/ota-master/config/policy_engine.hpp:\n   - class PolicyEngine\n   - isSafeStateForActivation(vehicle_state) → bool\n   - isNetworkAllowed(network_type) → bool\n   - shouldCheckOnIgnition() → bool\n   - getHealthMonitoringCycles() → int\n   - getErrorThresholdPercent() → int\n\n5. src/ota-master/registry/agent_registry.hpp + agent_registry.cpp:\n   - class AgentRegistry\n   - registerAgent(registration_data) → agent_id (UUID)\n   - updateHeartbeat(agent_id, timestamp)\n   - getAgent(agent_id) → agent info\n   - listAgents() → vector of agents\n   - markUnreachable(agent_id)\n   - getAgentsByNodeIdentifier(node_id) → filtered list\n   - Backed by Database (SQLite agents table)\n   - UUID generation for new agents\n\n6. tests/unit/master/CMakeLists.txt — unit_master_tests executable\n\nAcceptance criteria:\n   cmake --build build --target ota-master -j$(nproc)  → compiles (partial link OK)\n   Database schema matches shared-contracts.md §12 exactly\n\nREFERENCE: shared-contracts.md §12 for SQLite schema DDL.\nREFERENCE: shared-contracts.md §14 for config keys.\nREFERENCE: shared-contracts.md §13.2 for class/file mapping.\nREFERENCE: tech-spec.md §3 for data model.\nREFERENCE: tech-spec.md §6 for config file structure.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-found-001"],
+          "blockedBy": [
+            "test-found-001"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -113,7 +125,9 @@
           "description": "Write and run unit tests for Master foundation modules.\n\nTest files:\n\n1. tests/unit/master/test_config.cpp — TEST(Config, ...):\n   - LoadValidConfig: Load tests/fixtures/configs/test_master.json → all fields correct\n   - LoadMissingFile: Nonexistent path → error\n   - LoadMissingRequiredField: JSON without master.listen_unix → error\n   - LoadInvalidJson: Malformed JSON → error\n   - DefaultValues: Missing optional fields use defaults (bandwidth_limit_kbps=0)\n\n2. tests/unit/master/test_database.cpp — TEST(Database, ...):\n   - SchemaInitialized: Open fresh DB → all 5 tables exist (agents, campaigns, campaign_targets, downloads, audit_log)\n   - AgentCRUD: Insert → read → update → verify\n   - CampaignCRUD: Insert → read → update\n   - TransactionRollback: Begin → insert → rollback → data not present\n   - IndexesExist: All indexes from shared-contracts.md §12 exist\n\n3. tests/unit/master/test_agent_registry.cpp — TEST(AgentRegistry, ...):\n   - RegisterNewAgent: → UUID assigned, status 'registered', in DB\n   - RegisterSameNodeIdempotent: Same node_identifier → same agent_id\n   - UpdateHeartbeat: → last_heartbeat increases\n   - MarkUnreachableAfterTimeout: → status 'unreachable'\n   - ListAgents: Register 3 → list returns 3\n   - GetAgentById: Exists → returned. Not exists → error.\n   - GetAgentsByNodeIdentifier: Filter works correctly\n\nUse real SQLite temp file (NOT in-memory for testing WAL/persistence).\nTemp DB at /tmp/ota-test/test-master-{random}.db, cleaned in teardown.\n\nRULES: >= 2 assertions per test, no skips, no mocks for DB (real SQLite)\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_master_' --output-on-failure  → ALL PASS (for these 3 test files)\n\nREFERENCE: test-strategy.md 'Module: ota-master → Unit tests'.\nREFERENCE: shared-contracts.md §12, §14, §16.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-002"],
+          "blockedBy": [
+            "build-002"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -123,7 +137,9 @@
           "description": "Build the Master modules responsible for fetching packages from cloud, managing downloads, and verifying package integrity.\n\nFiles to create:\n\nNamespace: ota::master\n\n1. src/ota-master/cloud/cloud_client.hpp + cloud_client.cpp:\n   - class CloudClient\n   - Constructor takes base_url, timeout_seconds, retry_count from Config\n   - checkForUpdates(node_identifier, region) → vector<UpdateInfo>\n   - getManifest(package_id, version) → manifest JSON string\n   - getMetadata(package_id, version) → PackageMetadata (size, crc32, sha256, signature)\n   - downloadPackage(url, output_path, resume_from_byte) → downloaded bytes\n   - Uses libcurl with CURLOPT_RANGE for resume, CURLOPT_WRITEFUNCTION for streaming\n   - HTTP error handling: 404→OTA_ERR_NOT_FOUND, 5xx→retry, timeout→OTA_ERR_TIMEOUT\n   - See tech-spec.md §5 for all API endpoints\n\n2. src/ota-master/download/download_manager.hpp + download_manager.cpp:\n   - class DownloadManager\n   - startDownload(package_id, version, url, metadata) → download_id\n   - resumeDownload(download_id) → continues from downloaded_bytes\n   - pauseDownload(download_id)\n   - cancelDownload(download_id)\n   - supersede(old_download_id, new_package_id, new_version) → marks old as 'superseded'\n   - getDownloadState(download_id) → DownloadState\n   - Persistent state via Database (downloads table) + state JSON files\n   - File naming: {pkg_id}_{version}.ota.partial → .ota on completion\n   See shared-contracts.md §15 for file path patterns\n\n3. src/ota-master/download/download_state.hpp + download_state.cpp:\n   - class DownloadState\n   - Serializable to/from JSON for persistence at /var/lib/ota/downloads/{pkg}_{ver}.state.json\n   - Fields match downloads table columns from shared-contracts.md §12\n\n4. src/ota-master/verification/verification_pipeline.hpp + verification_pipeline.cpp:\n   - class VerificationPipeline\n   - verify(package_path, expected_size, expected_crc32, expected_sha256, signature, pubkey_path) → ota_error_t\n   - Pipeline order: size → CRC32 → SHA-256 → ECDSA P-256 (STOPS on first failure)\n   - Uses libota-core crypto functions (ota_crc32, ota_sha256_file, ota_ecdsa_verify)\n   - Each step logs result via spdlog\n   - Returns specific error code per shared-contracts.md §4 (200-204)\n\nAcceptance criteria:\n   cmake --build build --target ota-master -j$(nproc)  → compiles+links with libcurl\n   CloudClient, DownloadManager, VerificationPipeline classes compile\n\nREFERENCE: shared-contracts.md §4 for verification error codes.\nREFERENCE: shared-contracts.md §12 for downloads table schema.\nREFERENCE: shared-contracts.md §13.2 for class/file mapping.\nREFERENCE: shared-contracts.md §15 for download file paths.\nREFERENCE: tech-spec.md §5 for Mock Cloud API.\nREFERENCE: tech-spec.md §6 for cloud config keys.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-002"],
+          "blockedBy": [
+            "test-002"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -133,7 +149,9 @@
           "description": "Write and run unit tests for download and verification modules.\n\nTest files:\n\n1. tests/unit/master/test_download_state.cpp — TEST(DownloadState, ...):\n   - CreateNewDownload: state='pending', downloaded_bytes=0\n   - UpdateProgress: downloaded_bytes increases\n   - PersistAndReload: Write JSON → read back → identical\n   - MarkCompleted: state='completed'\n   - MarkSuperseded: state='superseded'\n   - MarkFailed: state='failed' with error message\n\n2. tests/unit/master/test_verification_pipeline.cpp — TEST(VerificationPipeline, ...):\n   - ValidPackagePassesAll: Good test package → OTA_OK\n   - SizeMismatchFailsFast: Wrong size → OTA_ERR_VERIFY_SIZE_MISMATCH (no CRC/SHA/sig attempted)\n   - Crc32MismatchFails: Correct size, wrong CRC → OTA_ERR_VERIFY_CRC32_MISMATCH\n   - Sha256MismatchFails: Correct size+CRC, wrong SHA → OTA_ERR_VERIFY_SHA256_MISMATCH\n   - SignatureFailureFails: Correct size+CRC+SHA, bad sig → OTA_ERR_VERIFY_SIGNATURE_FAILED\n   - PipelineStopsOnFirstFailure: Verify short-circuit behavior\n   Use real test files (create temp files with known content + known hashes)\n   Use test keys from tests/fixtures/keys/\n\nNote: CloudClient unit tests use GoogleMock to mock HTTP responses (MockCloudClient). DownloadManager tests can use a mock CloudClient. VerificationPipeline tests use real files + real crypto.\n\nRULES: >= 2 assertions per test, no skips, mocks only in tests/unit/\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_master_' --output-on-failure  → ALL master tests pass\n\nREFERENCE: test-strategy.md 'Module: ota-master → test_download_state.cpp, test_verification_pipeline.cpp'.\nREFERENCE: shared-contracts.md §4 for error codes.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-003"],
+          "blockedBy": [
+            "build-003"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -143,7 +161,9 @@
           "description": "Build the Master modules for manifest-based agent eligibility and campaign lifecycle management.\n\nFiles to create:\n\nNamespace: ota::master\n\n1. src/ota-master/compatibility/compatibility_engine.hpp + compatibility_engine.cpp:\n   - class CompatibilityEngine\n   - checkEligibility(agent_info, manifest) → ota_error_t (OTA_OK if eligible, OTA_ERR_COMPAT_* if not)\n   - filterEligibleAgents(agents_list, manifest) → vector of eligible agents\n   - Checks (in order): node_identifier match, os_version in range, sdk_version in range, region match, custom OEM rules\n   - Uses libota-core ota_version_in_range() for version comparisons\n   - Error codes 700-704 from shared-contracts.md §4\n\n2. src/ota-master/campaign/campaign_manager.hpp + campaign_manager.cpp:\n   - class CampaignManager\n   - createCampaign(manifest) → campaign_id (UUID)\n   - addTarget(campaign_id, agent_id)\n   - transitionCampaign(campaign_id, new_state) → validates transition via ota_campaign_can_transition()\n   - transitionTarget(campaign_id, agent_id, new_state) → validates via ota_target_can_transition()\n   - getCampaignStatus(campaign_id) → campaign state + all target states\n   - checkCampaignCompletion(campaign_id) → auto-transitions to COMPLETED if all targets done\n   - logAuditEvent(campaign_id, agent_id, event_type, details_json)\n   - Backed by Database (campaigns, campaign_targets, audit_log tables)\n   - State values from shared-contracts.md §6\n   - Audit event types from shared-contracts.md §12\n\nAcceptance criteria:\n   cmake --build build --target ota-master -j$(nproc)  → compiles\n   CompatibilityEngine and CampaignManager compile without errors\n\nREFERENCE: shared-contracts.md §4 for compatibility error codes (700-704).\nREFERENCE: shared-contracts.md §6 for state machine enums + string values.\nREFERENCE: shared-contracts.md §12 for DB tables + audit event types.\nREFERENCE: shared-contracts.md §13.2 for class/file mapping.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-002"],
+          "blockedBy": [
+            "test-002"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -153,7 +173,9 @@
           "description": "Write and run unit tests for compatibility engine and campaign manager.\n\nTest files:\n\n1. tests/unit/master/test_compatibility_engine.cpp — TEST(CompatibilityEngine, ...):\n   - CompatibleAgentEligible: Matching node, OS in range, matching region → OTA_OK\n   - NodeMismatchRejected: Different node_identifier → OTA_ERR_COMPAT_NODE_MISMATCH\n   - OsVersionBelowMinRejected: OS < min → OTA_ERR_COMPAT_OS_VERSION\n   - OsVersionAboveMaxRejected: OS > max → OTA_ERR_COMPAT_OS_VERSION\n   - RegionMismatchRejected: Different region → OTA_ERR_COMPAT_REGION\n   - MultipleAgentsDifferentEligibility: 3 agents, 1 eligible → filter returns 1\n   Use test agent identities from shared-contracts.md §16\n\n2. tests/unit/master/test_campaign_manager.cpp — TEST(CampaignManager, ...):\n   - CreateCampaign: → in DB, state='idle'\n   - ValidStateTransition: idle→downloading → OK\n   - InvalidStateTransition: completed→downloading → error\n   - AllTargetsCompletedTransitionsCampaign: All targets 'completed' → campaign 'completed'\n   - AnyTargetFailedHandled: One failed → campaign handles appropriately\n   - AuditLogCreated: State change → audit_log entry with correct event_type\n   Use real SQLite temp DB (same pattern as test-002)\n\nRULES: >= 2 assertions per test, no skips\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_master_' --output-on-failure  → ALL master tests pass\n\nREFERENCE: test-strategy.md 'Module: ota-master → test_compatibility_engine, test_campaign_manager'.\nREFERENCE: shared-contracts.md §4, §6, §12, §16.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-004"],
+          "blockedBy": [
+            "build-004"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -163,7 +185,10 @@
           "description": "Build the remaining Master modules and wire everything into the main executable.\n\nFiles to create:\n\nNamespace: ota::master\n\n1. src/ota-master/transport/transport_server.hpp + transport_server.cpp:\n   - class TransportServer\n   - startUnixListener(socket_path) — accepts Unix domain socket connections\n   - startTcpListener(host, port) — accepts TCP connections\n   - onMessage(callback) — dispatch received protocol messages\n   - sendMessage(connection_id, msg_type, payload) — serialize header + payload, send\n   - Uses ota_header_serialize/deserialize from libota-core\n   - Non-blocking I/O with select/poll/epoll\n\n2. src/ota-master/transport/connection.hpp + connection.cpp:\n   - class Connection\n   - read() → reads header + payload atomically\n   - write(header, payload) → sends header + payload\n   - getRemoteAddress() → for logging\n   - isAlive() → socket health check\n\n3. src/ota-master/transfer/package_transfer.hpp + package_transfer.cpp:\n   - class PackageTransfer\n   - startTransfer(connection_id, package_path, metadata) → sends TRANSFER_START then chunks\n   - Chunked transfer: reads file in transfer_chunk_size bytes, sends TRANSFER_DATA\n   - Waits for TRANSFER_ACK per chunk (with timeout)\n   - Handles TRANSFER_NACK → retry or abort\n   - Sends TRANSFER_COMPLETE after all chunks\n   - Progress tracking: bytes_sent / total_size\n   - Retry logic per policy.transfer_retry_count\n\n4. src/ota-master/activation/activation_controller.hpp + activation_controller.cpp:\n   - class ActivationController\n   - requestActivation(campaign_id, agent_id) → checks safe-state via PolicyEngine\n   - sendInstallCommand(connection_id, package_id, version, artifact_type)\n   - sendActivateCommand(connection_id, package_id, version, artifact_type)\n   - Safe-state gating: blocks activation until vehicle in approved state\n   - Sends INSTALL_CMD and ACTIVATE_CMD messages per shared-contracts.md §5.2\n\n5. src/ota-master/monitoring/health_aggregator.hpp + health_aggregator.cpp:\n   - class HealthAggregator\n   - processHealthReport(agent_id, health_report_json) → updates per-package health counters\n   - evaluateHealth(campaign_id, agent_id) → 'healthy' | 'rollback_needed' | 'monitoring'\n   - Tracks healthy_cycles per campaign_target (from campaign_targets table)\n   - Threshold: error_count/total > error_threshold_percent → rollback_needed\n   - Completion: healthy_cycles >= health_monitoring_cycles → completed\n\n6. src/ota-master/rollback/rollback_coordinator.hpp + rollback_coordinator.cpp:\n   - class RollbackCoordinator\n   - initiateRollback(campaign_id, agent_id, reason) → sends ROLLBACK_CMD\n   - handleRollbackStatus(agent_id, milestone) → updates campaign_target state\n   - Sends ROLLBACK_CMD message per shared-contracts.md §5.2\n   - Updates campaign/target states per shared-contracts.md §6\n\n7. src/ota-master/main.cpp:\n   - Parse command line args (--config path)\n   - Load Config\n   - Init Database + schema\n   - Create all module instances (registry, download_mgr, verification, compat, campaign, transport, transfer, activation, health, rollback)\n   - Start transport listeners\n   - Main event loop: poll for connections, dispatch messages to appropriate handlers\n   - Message routing: REGISTER_REQ→registry, HEARTBEAT→registry, TRANSFER_ACK/NACK→transfer, STATUS_REPORT→campaign+activation, HEALTH_REPORT→health_aggregator\n   - Graceful shutdown on SIGINT/SIGTERM\n\n8. tests/unit/master/CMakeLists.txt — update to include new test files\n\nAcceptance criteria:\n   cmake --build build --target ota-master -j$(nproc)  → compiles AND links to working executable\n   ./build/src/ota-master/ota-master --config tests/fixtures/configs/test_master.json → starts (may exit quickly if no agents, but no crash)\n\nREFERENCE: shared-contracts.md §5 for protocol messages.\nREFERENCE: shared-contracts.md §6 for state transitions.\nREFERENCE: shared-contracts.md §13.2 for class/file mapping.\nREFERENCE: shared-contracts.md §14 for config keys.\nREFERENCE: tech-spec.md §4 for wire protocol specification.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-003", "test-004"],
+          "blockedBy": [
+            "test-003",
+            "test-004"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -173,7 +198,9 @@
           "description": "Write and run unit tests for all remaining Master modules.\n\nTest files:\n\n1. tests/unit/master/test_health_aggregator.cpp — TEST(HealthAggregator, ...):\n   - HealthyCyclesAccumulate: N healthy reports → healthy_cycles==N\n   - ErrorExceedsThreshold: Error rate > threshold → 'rollback_needed'\n   - HealthyCyclesResetOnError: Healthy → error → healthy_cycles=0\n   - CompletedAfterRequiredCycles: health_monitoring_cycles healthy → 'completed'\n   - MultiplePackagesTrackedSeparately: Independent health tracking\n\n2. tests/unit/master/test_transport_server.cpp — TEST(TransportServer, ...):\n   - AcceptUnixConnection: Client connects to Unix socket → connection established\n   - AcceptTcpConnection: Client connects to TCP → connection established\n   - SendReceiveMessage: Send header+payload → receive and parse correctly\n   - InvalidMagicRejected: Bad magic → connection error handling\n\n3. tests/unit/master/test_package_transfer.cpp — TEST(PackageTransfer, ...):\n   - TransferSmallFile: File < chunk_size → 1 data message + complete\n   - TransferLargeFile: File > chunk_size → multiple chunks + complete\n   - TransferAckTracking: ACKs update progress correctly\n   - TransferNackRetry: NACK → retry up to limit\n\nNote: Transport tests may use real local sockets (Unix domain) — this is acceptable.\nGoogleMock allowed for Connection objects in unit tests.\n\nRULES: >= 2 assertions per test, no skips, mocks only in tests/unit/\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_master_' --output-on-failure  → ALL master tests pass (cumulative: all test files from test-002 through test-005)\n\nREFERENCE: test-strategy.md 'Module: ota-master'.\nREFERENCE: shared-contracts.md §5, §6, §13.2.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-005"],
+          "blockedBy": [
+            "build-005"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -183,7 +210,9 @@
           "description": "Build the Linux Agent's core modules for connecting to Master and handling software artifacts.\n\nFiles to create:\n\nNamespace: ota::agent\n\n1. src/ota-agent/CMakeLists.txt:\n   - Executable target 'ota-agent'\n   - Links: ota-core, nlohmann_json, spdlog, libarchive\n   - Include dirs\n\n2. src/ota-agent/transport/transport_client.hpp + transport_client.cpp:\n   - class TransportClient\n   - connect(address, transport_type) → Unix socket or TCP\n   - sendMessage(msg_type, payload) → serialize header + payload\n   - receiveMessage() → parse header + payload\n   - sendRegisterReq(agent_info) → builds REGISTER_REQ JSON, sends\n   - sendHeartbeat(agent_id) → sends HEARTBEAT message\n   - sendStatusReport(agent_id, pkg_id, ver, milestone, error) → STATUS_REPORT\n   - sendHealthReport(agent_id, cycle, packages) → HEALTH_REPORT\n   - sendTransferAck(pkg_id, ver, received_bytes) → TRANSFER_ACK\n   Uses ota_header_serialize/deserialize from libota-core\n\n3. src/ota-agent/installer/sw_installer.hpp + sw_installer.cpp:\n   - class SwInstaller\n   - install(package_path, package_id, version, install_base_dir) → ota_error_t\n   - Extract .ota (tar.gz via libarchive) to {install_base_dir}/{package_id}/{version}/\n   - Verify extracted exe exists\n   - Handle optional libs/ and res/ directories\n   - Create 'newer' symlink: {install_base_dir}/{package_id}/newer → {version}/\n   - File paths per shared-contracts.md §15\n\n4. src/ota-agent/activator/sw_activator.hpp + sw_activator.cpp:\n   - class SwActivator\n   - activate(package_id, install_base_dir) → ota_error_t\n   - Read 'newer' symlink target\n   - If 'current' exists: rename to 'prev'\n   - Rename 'newer' to 'current' (atomic symlink swap)\n   - Remove 'newer' symlink\n   - Symlink pattern: newer→current→prev per shared-contracts.md §15\n\n5. tests/unit/agent/CMakeLists.txt — unit_agent_tests executable\n\nAcceptance criteria:\n   cmake --build build --target ota-agent -j$(nproc)  → compiles\n   TransportClient, SwInstaller, SwActivator classes compile\n\nREFERENCE: shared-contracts.md §5.2 for message JSON schemas.\nREFERENCE: shared-contracts.md §13.3 for class/file mapping.\nREFERENCE: shared-contracts.md §15 for agent file paths.\nREFERENCE: tech-spec.md §4 for wire protocol.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-found-001"],
+          "blockedBy": [
+            "test-found-001"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -193,7 +222,9 @@
           "description": "Write and run unit tests for Agent software installation and activation.\n\nTest files:\n\n1. tests/unit/agent/test_sw_installer.cpp — TEST(SwInstaller, ...):\n   - InstallValidPackage: Extract .ota → /tmp/ota-test/opt/{pkg_id}/{version}/exe exists\n   - InstallCreatesNewerSymlink: 'newer' symlink points to version dir\n   - InstallWithLibs: libs/ directory populated\n   - InstallWithResources: res/ directory populated\n   - InstallCreatesParentDirs: Fresh path → all dirs created\n   - InstallSameVersionIdempotent: Double install → no error\n   - InstallInvalidPackage: Corrupted tar.gz → OTA_ERR_INSTALL_EXTRACT\n\n2. tests/unit/agent/test_sw_activator.cpp — TEST(SwActivator, ...):\n   - ActivateSwapsSymlinks: newer→current, old current→prev\n   - ActivateRemovesNewer: 'newer' removed after activation\n   - ActivateNoNewerFails: No 'newer' → error\n   - ActivatePreservesExePermissions: Permissions intact\n\nTests use real filesystem at /tmp/ota-test/opt/. Create test .ota archives in test setup using libarchive or pre-built fixtures.\n\nRULES: >= 2 assertions per test, no skips, no mocks for filesystem\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_agent_' --output-on-failure  → ALL pass\n\nREFERENCE: test-strategy.md 'Module: ota-agent → test_sw_installer, test_sw_activator'.\nREFERENCE: shared-contracts.md §15 for file paths.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-006"],
+          "blockedBy": [
+            "build-006"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -203,7 +234,10 @@
           "description": "Build remaining Agent modules and wire into main executable.\n\nFiles to create:\n\nNamespace: ota::agent\n\n1. src/ota-agent/installer/fw_installer.hpp + fw_installer.cpp:\n   - class FwInstaller\n   - install(package_path, bootloader_iface) → ota_error_t\n   - Calls bootloader_iface->detect_inactive_slot()\n   - Calls bootloader_iface->stage_firmware() with firmware data\n   - Firmware data extracted from .ota package (the 'exe' entry)\n\n2. src/ota-agent/activator/fw_activator.hpp + fw_activator.cpp:\n   - class FwActivator\n   - activate(bootloader_iface) → ota_error_t\n   - Calls bootloader_iface->prepare_activation()\n   - Simulates reboot trigger (in dev: just log + state change)\n\n3. src/ota-agent/rollback/rollback_executor.hpp + rollback_executor.cpp:\n   - class RollbackExecutor\n   - rollbackSw(package_id, install_base_dir) → revert current→prev symlink\n   - rollbackFw(bootloader_iface) → mark_slot_invalid on active slot\n   - Returns milestone STATUS_REPORT data (ROLLBACK_STARTED, ROLLBACK_COMPLETED)\n\n4. src/ota-agent/health/health_monitor.hpp + health_monitor.cpp:\n   - class HealthMonitor\n   - recordHealthyCycle(package_id)\n   - recordError(package_id)\n   - recordCrash(package_id)\n   - generateReport(agent_id, driving_cycle) → HEALTH_REPORT JSON\n   - resetCounters(package_id)\n   - Fields match shared-contracts.md §5.2 HEALTH_REPORT schema\n\n5. src/ota-agent/main.cpp:\n   - Parse --config path\n   - Load agent config\n   - Create bootloader plugin via ota_bootloader_create(config.bootloader.plugin, config.bootloader.config)\n   - Connect to Master via TransportClient\n   - Send REGISTER_REQ\n   - Main loop: heartbeat, receive commands, dispatch to installer/activator/rollback\n   - Message routing: TRANSFER_START→prepare, TRANSFER_DATA→buffer, INSTALL_CMD→installer, ACTIVATE_CMD→activator, ROLLBACK_CMD→rollback\n   - Graceful shutdown on SIGINT/SIGTERM\n\nAcceptance criteria:\n   cmake --build build --target ota-agent -j$(nproc)  → compiles AND links\n   ./build/src/ota-agent/ota-agent --config tests/fixtures/configs/test_agent.json → starts (exits if master unavailable, but no crash)\n\nREFERENCE: shared-contracts.md §5.2 for HEALTH_REPORT, STATUS_REPORT, ROLLBACK_CMD schemas.\nREFERENCE: shared-contracts.md §11 for bootloader interface.\nREFERENCE: shared-contracts.md §13.3 for class/file mapping.\nREFERENCE: shared-contracts.md §15 for file paths.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-006", "test-001"],
+          "blockedBy": [
+            "test-006",
+            "test-001"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -213,7 +247,9 @@
           "description": "Write and run unit tests for firmware installation, rollback, and health monitoring.\n\nTest files:\n\n1. tests/unit/agent/test_fw_installer.cpp — TEST(FwInstaller, ...):\n   - StageFirmwareCallsPlugin: Calls detect_inactive_slot + stage_firmware\n   - StageFirmwareSlotError: Plugin error → OTA_ERR_INSTALL_SLOT\n   - StageFirmwareDataWritten: Data passed correctly to plugin\n   Use sim bootloader plugin (real, not mocked)\n\n2. tests/unit/agent/test_rollback_executor.cpp — TEST(RollbackExecutor, ...):\n   - SwRollbackRevertsSymlinks: current→prev version\n   - SwRollbackNoPrevFails: No prev → error\n   - FwRollbackMarksSlotInvalid: Calls mark_slot_invalid on active slot\n\n3. tests/unit/agent/test_health_monitor.cpp — TEST(HealthMonitor, ...):\n   - RecordHealthyCycle: healthy_cycles increments\n   - RecordError: error_count increments\n   - RecordCrash: crash_count increments\n   - GenerateHealthReport: Correct JSON with all HEALTH_REPORT fields\n   - ResetCounters: After rollback → counters zero\n\nRULES: >= 2 assertions per test, no skips\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_agent_' --output-on-failure  → ALL agent tests pass (cumulative: test-006 + test-007)\n\nREFERENCE: test-strategy.md 'Module: ota-agent'.\nREFERENCE: shared-contracts.md §5.2, §11.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-007"],
+          "blockedBy": [
+            "build-007"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -223,7 +259,10 @@
           "description": "Build the complete FreeRTOS Agent as an x86 executable simulating embedded behavior.\n\nFiles to create (all C11):\n\n1. src/ota-agent-freertos/CMakeLists.txt:\n   - Executable target 'ota-agent-freertos'\n   - Links: ota-core, pthread\n   - C standard 11\n\n2. src/ota-agent-freertos/hal/hal.h:\n   - EXACT interface from shared-contracts.md §13.4 HAL interface\n   - ota_hal_flash_write, _read, _erase, _system_reset, _watchdog_feed\n\n3. src/ota-agent-freertos/hal/hal_sim.c:\n   - Simulates flash using a memory-mapped file (or heap buffer)\n   - flash_write: memcpy to buffer at addr offset\n   - flash_read: memcpy from buffer\n   - flash_erase: memset to 0xFF\n   - system_reset: logs 'SIMULATED RESET', resets state\n   - watchdog_feed: no-op in simulation\n\n4. src/ota-agent-freertos/agent_task.h + agent_task.c:\n   - Agent state machine: IDLE → REGISTERING → ACTIVE → UPDATING → ...\n   - ota_agent_task_init() — initialize state\n   - ota_agent_task_run() — main loop (called from thread)\n   - Command dispatch: INSTALL_CMD → fw_installer, ACTIVATE_CMD → fw_activator, ROLLBACK_CMD → rollback\n   - Heartbeat at configured interval\n\n5. src/ota-agent-freertos/transport_client.h + transport_client.c:\n   - TCP socket client using POSIX sockets (simulating lwIP)\n   - ota_freertos_transport_connect(host, port)\n   - ota_freertos_transport_send(msg_type, payload, len)\n   - ota_freertos_transport_recv(header, payload, max_len)\n   - Uses ota_header_serialize/deserialize from libota-core\n\n6. src/ota-agent-freertos/fw_installer.h + fw_installer.c:\n   - ota_freertos_fw_install(package_data, len, bootloader) → stages to inactive slot\n\n7. src/ota-agent-freertos/fw_activator.h + fw_activator.c:\n   - ota_freertos_fw_activate(bootloader) → prepare_activation + system_reset\n\n8. src/ota-agent-freertos/health_monitor.h + health_monitor.c:\n   - Error/crash counters, health report generation\n\n9. src/ota-agent-freertos/bootloader/mcuboot_plugin.h + mcuboot_sim.c:\n   - MCUboot simulation: uses HAL flash for slot management\n   - Implements ota_bootloader_interface_t function pointers\n\n10. src/ota-agent-freertos/main.c:\n    - Parse config (or hardcoded for sim)\n    - Create MCUboot sim plugin\n    - Start agent task in a pthread (simulating FreeRTOS task)\n    - Wait for shutdown signal\n\nAcceptance criteria:\n   cmake --build build --target ota-agent-freertos -j$(nproc)  → compiles AND links\n   ./build/src/ota-agent-freertos/ota-agent-freertos → starts (exits if master unavailable, no crash)\n\nREFERENCE: shared-contracts.md §13.4 for function/module mapping.\nREFERENCE: shared-contracts.md §11 for bootloader interface.\nREFERENCE: shared-contracts.md §5 for protocol messages.\nREFERENCE: tech-spec.md §2 for file structure.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-found-001", "test-001"],
+          "blockedBy": [
+            "test-found-001",
+            "test-001"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -233,7 +272,9 @@
           "description": "Write and run C unit tests for the FreeRTOS Agent using Unity framework.\n\nTest files:\n\n1. tests/unit/agent_freertos/test_agent_task.c:\n   - test_initial_state_is_idle: Agent starts in IDLE\n   - test_transition_to_registering: Start → REGISTERING\n   - test_heartbeat_interval: Heartbeat sent at configured interval\n   - test_command_dispatch_install: INSTALL_CMD → routes to fw_installer\n   - test_command_dispatch_activate: ACTIVATE_CMD → routes to fw_activator\n   - test_command_dispatch_rollback: ROLLBACK_CMD → routes to rollback\n\n2. tests/unit/agent_freertos/test_fw_installer.c:\n   - test_stage_calls_hal_flash_write: Calls ota_hal_flash_write with correct addr/len\n   - test_stage_writes_to_inactive_slot: Writes to slot B when A is active\n   - test_stage_reports_milestone: STATUS_REPORT with install_completed\n\n3. tests/unit/agent_freertos/test_hal_sim.c:\n   - test_flash_write_read_roundtrip: Write → read → matches\n   - test_flash_erase_zeros_region: Erase → read → all 0xFF\n   - test_flash_write_boundary: End of region → succeeds\n   - test_flash_write_past_end: Beyond region → error\n\nUnity test runner in each .c file with setUp/tearDown.\n\nRULES: >= 2 assertions per test (Unity TEST_ASSERT_*), no TEST_IGNORE\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_agent_freertos_' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Module: ota-agent-freertos'.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-008"],
+          "blockedBy": [
+            "build-008"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -243,7 +284,9 @@
           "description": "Build the CLI packaging tool for creating, signing, verifying, and inspecting .ota packages.\n\nFiles to create:\n\nNamespace: ota::pack\n\n1. src/ota-pack/CMakeLists.txt:\n   - Executable target 'ota-pack'\n   - Links: ota-core, nlohmann_json, libarchive\n\n2. src/ota-pack/main.cpp:\n   - Parse subcommand: create | sign | verify | inspect\n   - CLI syntax per shared-contracts.md §13.5:\n     ota-pack create --manifest <manifest.json> --dir <source_dir> --output <output.ota>\n     ota-pack sign --key <private_key.pem> --package <package.ota>\n     ota-pack verify --pubkey <public_key.pem> --package <package.ota>\n     ota-pack inspect --package <package.ota>\n   - Exit code 0 on success, non-zero on failure\n\n3. src/ota-pack/packager.hpp + packager.cpp:\n   - class Packager\n   - create(manifest_path, source_dir, output_path) → creates tar.gz .ota archive\n   - Archive structure per tech-spec.md §10:\n     manifest.json (from manifest_path)\n     exe (from source_dir, REQUIRED)\n     libs/ (from source_dir, optional)\n     res/ (from source_dir, optional)\n     rdinit (from source_dir, optional for FW)\n   - Uses libarchive for tar.gz creation\n   - Validates exe exists in source_dir before archiving\n\n4. src/ota-pack/signer.hpp + signer.cpp:\n   - class Signer\n   - sign(private_key_path, package_path) → reads manifest.json from archive, signs with ECDSA P-256, writes signature.bin back into archive\n   - verify(public_key_path, package_path) → extracts manifest.json + signature.bin, verifies\n   - Uses ota_ecdsa_sign/verify from libota-core\n\nAcceptance criteria:\n   cmake --build build --target ota-pack -j$(nproc)  → compiles AND links\n   ./build/src/ota-pack/ota-pack --help → shows usage (or no crash)\n\nREFERENCE: shared-contracts.md §13.5 for CLI syntax.\nREFERENCE: tech-spec.md §10 for .ota package format.\nREFERENCE: tech-spec.md §12 for build commands.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-found-001"],
+          "blockedBy": [
+            "test-found-001"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -253,7 +296,9 @@
           "description": "Write and run unit tests and functional CLI tests for ota-pack.\n\nTest files:\n\n1. tests/unit/pack/test_packager.cpp — TEST(Packager, ...):\n   - CreateSwPackage: Source dir with exe → valid .ota file\n   - CreateFwPackage: Firmware source → valid .ota\n   - CreateWithLibs: libs/ included in archive\n   - CreateWithResources: res/ included\n   - CreateMissingExe: No exe → error\n   - CreateMissingManifest: No manifest → error\n   - InspectSwPackage: Dump → shows package_identifier, version\n\n2. tests/unit/pack/test_signer.cpp — TEST(Signer, ...):\n   - SignProducesSignatureFile: Sign → signature.bin in archive\n   - VerifySignedPackageSucceeds: Sign → verify → success\n   - VerifyTamperedPackageFails: Modify after sign → verify fails\n   - VerifyUnsignedPackageFails: No signature.bin → error\n   - SignWithInvalidKeyFails: Bad key → error\n\n3. Functional test (in CMakeLists.txt as CTest):\n   - Create package → sign → verify → inspect pipeline\n   - See verification-plan.md 'Module: ota-pack' for exact commands\n\nRULES: >= 2 assertions per test, no skips\n\nAcceptance criteria:\n   cd build && ctest -R '^unit_pack_\\|^func_pack_' --output-on-failure  → ALL PASS\n   Manual functional test from verification-plan.md also passes\n\nREFERENCE: test-strategy.md 'Module: ota-pack'.\nREFERENCE: verification-plan.md 'Module: ota-pack' for shell commands.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-009"],
+          "blockedBy": [
+            "build-009"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -273,7 +318,9 @@
           "description": "Write and run pytest tests for the mock cloud server.\n\nTest files:\n\n1. tools/mock-cloud/test_routes_updates.py:\n   - test_list_updates_empty: No packages → empty list\n   - test_list_updates_with_package: Add → appears in list\n   - test_list_updates_filter_by_node: Correct filtering\n   - test_get_manifest_exists: → 200 + JSON manifest\n   - test_get_manifest_not_found: → 404\n   - test_download_package_full: → 200 + binary\n   - test_download_package_range: Range header → 206 + partial\n   - test_download_package_not_found: → 404\n   - test_get_metadata: → 200 + size, crc32, sha256, signature\n\n2. tools/mock-cloud/test_routes_admin.py:\n   - test_add_package: Upload → 201\n   - test_add_package_invalid: Missing manifest → 400\n   - test_inject_network_error: Set error → next download fails\n   - test_inject_corrupted_download: → corrupted data\n   - test_inject_truncated_download: → cut off\n   - test_inject_slow_response: → delayed\n   - test_inject_version_supersede: → new version appears\n   - test_reset_clears_errors: Reset → errors gone\n   - test_reset_clears_packages: Reset → packages gone\n\nUse httpx TestClient (AsyncClient) for all tests.\n\nAcceptance criteria:\n   cd tools/mock-cloud && python3 -m pytest -v  → ALL PASS\n\nREFERENCE: test-strategy.md 'Module: mock-cloud'.\nREFERENCE: shared-contracts.md §13.6.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["build-010"],
+          "blockedBy": [
+            "build-010"
+          ],
           "attempts": 0,
           "passes": false
         }
@@ -289,7 +336,10 @@
           "description": "Use the working ota-pack CLI to generate all test fixture packages.\n\nPackages to create:\n\n1. tests/fixtures/packages/valid_sw_package.ota:\n   - Create temp source dir with: exe (dummy shell script), libs/ (dummy .so), res/ (dummy config.json)\n   - Use manifest: tests/fixtures/manifests/valid_sw_manifest.json\n   - ota-pack create → ota-pack sign with test_private.pem\n   - Verify: ota-pack verify with test_public.pem → success\n\n2. tests/fixtures/packages/valid_fw_package.ota:\n   - Create temp source dir with: exe (dummy firmware binary)\n   - Use manifest: tests/fixtures/manifests/valid_fw_manifest.json\n   - ota-pack create → ota-pack sign\n\n3. tests/fixtures/packages/corrupted_package.ota:\n   - Copy valid_sw_package.ota\n   - Flip some bytes in the middle (corrupt the archive)\n   - Do NOT re-sign\n\n4. tests/fixtures/packages/bad_signature.ota:\n   - Create valid package\n   - Generate a SECOND keypair (not the test keys)\n   - Sign with the second key\n   - Package content valid, but signature won't verify with test_public.pem\n\nAlso compute and record metadata for each package:\n   - File size (bytes)\n   - CRC32 value\n   - SHA-256 hex digest\n   Store in tests/fixtures/packages/metadata.json for test reference\n\nAcceptance criteria:\n   All 4 .ota files exist in tests/fixtures/packages/\n   ota-pack verify test_public.pem valid_sw_package.ota → success\n   ota-pack verify test_public.pem corrupted_package.ota → failure\n   ota-pack verify test_public.pem bad_signature.ota → failure\n   metadata.json contains size, crc32, sha256 for each package\n\nREFERENCE: shared-contracts.md §15 for fixture paths.\nREFERENCE: shared-contracts.md §16 for test package IDs and versions.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-009", "infra-002"],
+          "blockedBy": [
+            "test-009",
+            "infra-002"
+          ],
           "attempts": 0,
           "passes": false
         }
@@ -305,7 +355,10 @@
           "description": "Write and run integration test for agent registration and heartbeat flow.\n\nFile: tests/integration/test_master_agent_registration.cpp\n\nTest scenarios:\n   - AgentRegistersViaTcp: Start master (background), start agent (TCP mode) → agent gets UUID → master has agent in registry DB → heartbeats maintain last_heartbeat\n   - AgentRegistersViaUnixSocket: Same but Unix socket transport\n   - HeartbeatKeepsAlive: Agent heartbeats → master tracks timestamps\n   - HeartbeatTimeoutMarksUnreachable: Stop agent → wait > timeout → master marks unreachable\n   - MultipleAgentsRegister: Master + 3 agents → all 3 register, all in DB\n\nTest infrastructure:\n   - GTest fixture that starts/stops master process\n   - Use test configs from tests/fixtures/configs/\n   - Use TEST_MASTER_TCP_PORT, TEST_MASTER_UNIX_SOCK from shared-contracts.md §16\n   - Clean /tmp/ota-test/ in setUp, tearDown\n\nNO MOCKS. Real sockets, real protocol messages, real SQLite.\n\nAcceptance criteria:\n   cd build && ctest -R '^integ_.*registration' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Integration Test Plan → test_master_agent_registration'.\nREFERENCE: shared-contracts.md §5.2 for REGISTER_REQ/ACK, HEARTBEAT schemas.\nREFERENCE: shared-contracts.md §16 for test config values.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-005", "test-007"],
+          "blockedBy": [
+            "test-005",
+            "test-007"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -315,7 +368,11 @@
           "description": "Write and run integration test for chunked package transfer.\n\nFile: tests/integration/test_package_transfer.cpp\n\nTest scenarios:\n   - TransferSmallPackage: Master transfers small .ota → Agent receives all chunks → TRANSFER_COMPLETE → SHA-256 matches\n   - TransferLargePackage: Multiple chunks → all ACKed → complete\n   - TransferAckProgress: Each TRANSFER_ACK has increasing received_bytes\n   - TransferCompleteFileIntegrity: Received file SHA-256 matches expected\n\nUses real Master + Agent processes, real IPC, real test packages from infra-004.\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^integ_.*transfer' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Integration → test_package_transfer'.\nREFERENCE: shared-contracts.md §5.2 for TRANSFER_START/DATA/ACK/COMPLETE schemas.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-005", "test-007", "infra-004"],
+          "blockedBy": [
+            "test-005",
+            "test-007",
+            "infra-004"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -325,7 +382,11 @@
           "description": "Write and run integration test for full SW install→activate lifecycle.\n\nFile: tests/integration/test_sw_install_activate.cpp\n\nTest scenarios:\n   - FullSwInstallActivateFlow: Master sends INSTALL_CMD → Agent extracts package → creates version dir + newer symlink → Master sends ACTIVATE_CMD → Agent swaps symlinks (newer→current→prev) → STATUS_REPORT milestones: install_started, install_completed, activate_started, activate_completed\n   - SwRollbackAfterActivate: Install → activate → ROLLBACK_CMD → reverts to previous\n   - FileSystemStateCorrect: After each step, verify symlinks and directories\n\nUses real Master + Agent, real IPC, real filesystem at /tmp/ota-test/opt/.\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^integ_.*sw_install' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Integration → test_sw_install_activate'.\nREFERENCE: shared-contracts.md §5.2, §15.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-005", "test-007", "infra-004"],
+          "blockedBy": [
+            "test-005",
+            "test-007",
+            "infra-004"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -335,7 +396,11 @@
           "description": "Write and run integration test for FW install→activate via bootloader plugin.\n\nFile: tests/integration/test_fw_install_activate.cpp\n\nTest scenarios:\n   - FullFwInstallActivateFlow: Master sends INSTALL_CMD (firmware) → Agent stages via sim bootloader plugin → Master sends ACTIVATE_CMD → Agent calls prepare_activation → boot status shows pending_activation=true → STATUS_REPORT milestones received\n   - BootloaderStateCorrect: After staging, inactive slot has data. After activation prep, pending=true.\n\nUses real Master + Agent with sim bootloader plugin.\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^integ_.*fw_install' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Integration → test_fw_install_activate'.\nREFERENCE: shared-contracts.md §5.2, §11.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-005", "test-007", "infra-004"],
+          "blockedBy": [
+            "test-005",
+            "test-007",
+            "infra-004"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -345,7 +410,10 @@
           "description": "Write and run integration test for rollback scenarios.\n\nFile: tests/integration/test_rollback_flow.cpp\n\nTest scenarios:\n   - SwRollbackRevertsSymlinks: ROLLBACK_CMD → current→prev, STATUS_REPORT: rollback_started, rollback_completed\n   - FwRollbackMarksSlotInvalid: ROLLBACK_CMD → bootloader marks active slot invalid\n   - MasterInitiatedRollback: Health threshold exceeded → Master sends ROLLBACK_CMD → Agent executes\n   - FileSystemAfterRollback: SW symlinks match pre-activation state\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^integ_.*rollback' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Integration → test_rollback_flow'.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-013", "test-014"],
+          "blockedBy": [
+            "test-013",
+            "test-014"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -355,7 +423,11 @@
           "description": "Write and run integration test for resumable downloads.\n\nFile: tests/integration/test_download_resume.cpp\n\nTest scenarios:\n   - ResumeAfterInterruption: Start download → stop Master → restart → download resumes from last byte (HTTP Range header) → completes → verification passes\n   - DownloadStatePersisted: Download state JSON written before interruption, read on resume\n   - PartialFilePreserved: .ota.partial file preserved across restart\n\nRequires mock cloud running. Master downloads from cloud.\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^integ_.*resume' --output-on-failure  → ALL PASS\n\nREFERENCE: test-strategy.md 'Integration → test_download_resume'.\nREFERENCE: shared-contracts.md §15 for download file paths.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-005", "test-010", "infra-004"],
+          "blockedBy": [
+            "test-005",
+            "test-010",
+            "infra-004"
+          ],
           "attempts": 0,
           "passes": false
         }
@@ -371,7 +443,13 @@
           "description": "Write and run end-to-end test for complete SW update campaign.\n\nFile: tests/e2e/test_full_sw_campaign.cpp\n\nFull flow: Mock cloud has update → Master polls → downloads → verifies (size+CRC32+SHA256+ECDSA) → transfers to agent → agent installs (extracts + newer symlink) → agent activates (symlink swap) → health monitoring passes for N cycles → campaign COMPLETED\n\nAssertions:\n   - Campaign starts in IDLE\n   - Download completes, state='completed'\n   - Verification passes all 4 stages\n   - Agent installs + activates successfully (STATUS_REPORT milestones)\n   - Health monitoring: N healthy cycles → campaign COMPLETED\n   - Audit log contains ALL lifecycle events\n   - Per-target state reaches COMPLETED\n\nProcesses: Mock Cloud (background) + Master + Linux Agent\nTest packages from infra-004. Test configs from infra-003.\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^e2e_.*sw_campaign' --output-on-failure  → PASS\n\nREFERENCE: test-strategy.md 'E2E → test_full_sw_campaign'.\nREFERENCE: PRD.md acceptance criteria #1, #2, #3, #4, #9.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-011", "test-012", "test-013", "test-015", "test-016"],
+          "blockedBy": [
+            "test-011",
+            "test-012",
+            "test-013",
+            "test-015",
+            "test-016"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -381,7 +459,13 @@
           "description": "Write and run end-to-end test for complete FW update campaign.\n\nFile: tests/e2e/test_full_fw_campaign.cpp\n\nSame full flow as SW campaign but with firmware artifact type:\n   - Master downloads FW package\n   - Transfers to agent\n   - Agent stages via sim bootloader plugin\n   - Agent activates (prepare_activation + simulated reboot)\n   - Health monitoring passes\n   - Campaign COMPLETED\n\nAssertions:\n   - Bootloader plugin called correctly at each stage\n   - Boot status reflects staging and activation\n   - All STATUS_REPORT milestones received\n   - Campaign and target states reach COMPLETED\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^e2e_.*fw_campaign' --output-on-failure  → PASS\n\nREFERENCE: test-strategy.md 'E2E → test_full_fw_campaign'.\nREFERENCE: PRD.md acceptance criteria #6, #9.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-011", "test-012", "test-014", "test-015", "test-016"],
+          "blockedBy": [
+            "test-011",
+            "test-012",
+            "test-014",
+            "test-015",
+            "test-016"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -391,7 +475,10 @@
           "description": "Write and run end-to-end tests for error handling and recovery.\n\nFile: tests/e2e/test_error_recovery.cpp\n\nScenarios:\n   1. CorruptedPackageRejected: Mock cloud serves corrupted package → Master verification rejects → campaign ABORTED → audit log entry\n   2. NetworkFailureResume: Mock cloud injects network error mid-download → Master retries / resumes → eventually completes\n   3. AgentInstallFailure: Agent install fails → auto-rollback → target ROLLED_BACK → Master notified\n   4. ActivateFailure: Agent activate fails → Master-initiated rollback → all targets rolled back\n\nUses mock cloud error injection API (POST /admin/inject-error).\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^e2e_.*error_recovery' --output-on-failure  → PASS\n\nREFERENCE: test-strategy.md 'E2E → test_error_recovery'.\nREFERENCE: PRD.md acceptance criteria #2, #5, #10.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-017", "test-018"],
+          "blockedBy": [
+            "test-017",
+            "test-018"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -401,7 +488,9 @@
           "description": "Write and run end-to-end test for version superseding.\n\nFile: tests/e2e/test_version_supersede.cpp\n\nFlow: Master starts downloading nav-service v2.2.0 → Mock cloud adds v2.3.0 (via admin API or inject-error 'version_supersede') → Master detects newer version → marks v2.2.0 download as 'superseded' → starts downloading v2.3.0 → completes normally\n\nAssertions:\n   - Old download state = 'superseded' in DB\n   - Old .ota.partial cleaned up or abandoned\n   - New download starts from byte 0\n   - New download completes + verifies\n   - Campaign targets the new version\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^e2e_.*supersede' --output-on-failure  → PASS\n\nREFERENCE: test-strategy.md 'E2E → test_version_supersede'.\nREFERENCE: PRD.md requirement M-05.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-017"],
+          "blockedBy": [
+            "test-017"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -411,7 +500,11 @@
           "description": "Write and run test for a campaign targeting multiple heterogeneous agents.\n\nFile: tests/integration/test_multi_agent_campaign.cpp\n\nScenario: Master + 2 Linux Agents + 1 FreeRTOS Agent all register. Campaign created targeting all 3 eligible agents. All receive packages, all install, all activate. Campaign reaches COMPLETED with all targets COMPLETED.\n\nAssertions:\n   - 3 agents register successfully (2 Linux, 1 FreeRTOS)\n   - Campaign targets all 3\n   - Parallel/sequential transfers to all 3\n   - All 3 install (SW for Linux, FW for FreeRTOS)\n   - All 3 activate\n   - Per-target states all COMPLETED\n   - Campaign state COMPLETED\n\nNO MOCKS.\n\nAcceptance criteria:\n   cd build && ctest -R '^integ_.*multi_agent\\|^e2e_.*multi_agent' --output-on-failure  → PASS\n\nREFERENCE: test-strategy.md 'Integration → test_multi_agent_campaign'.\nREFERENCE: PRD.md acceptance criteria #7, #11.",
           "skill": "develop",
           "status": "pending",
-          "blockedBy": ["test-017", "test-018", "test-008"],
+          "blockedBy": [
+            "test-017",
+            "test-018",
+            "test-008"
+          ],
           "attempts": 0,
           "passes": false
         }
@@ -427,7 +520,13 @@
           "description": "Run the judge skill to evaluate the entire codebase:\n\n1. Build: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DOTA_BUILD_TESTS=ON && cmake --build build -j$(nproc) → zero warnings\n2. All tests: cd build && ctest --output-on-failure → ALL PASS\n3. Coverage: gcovr → check thresholds (80% libota-core, 70% master/agent)\n4. Contract compliance: Verify all identifiers in code match shared-contracts.md\n5. Mock contamination: grep for mocks outside tests/unit/ → zero hits\n6. Skip check: grep for GTEST_SKIP/DISABLED_ → zero hits\n7. Architecture review: File structure matches tech-spec.md §2\n8. State machine compliance: All transitions match shared-contracts.md §6\n9. Protocol compliance: All message types and JSON schemas match shared-contracts.md §5\n10. Security review: Verification pipeline order (size→CRC32→SHA256→ECDSA), no key material in code\n\nOutput: Quality report with pass/fail for each gate.",
           "skill": "judge",
           "status": "pending",
-          "blockedBy": ["test-017", "test-018", "test-019", "test-020", "test-021"],
+          "blockedBy": [
+            "test-017",
+            "test-018",
+            "test-019",
+            "test-020",
+            "test-021"
+          ],
           "attempts": 0,
           "passes": false
         },
@@ -437,7 +536,9 @@
           "description": "Compile final quality report based on judge evaluation:\n   - Build status (warnings, errors)\n   - Test results (pass/fail counts per tier)\n   - Coverage percentages per module\n   - Contract compliance status\n   - Architecture compliance status\n   - Known issues / tech debt\n   - Recommendations for Phase 2\n\nPresent to human for review.",
           "skill": "judge",
           "status": "pending",
-          "blockedBy": ["judge-001"],
+          "blockedBy": [
+            "judge-001"
+          ],
           "attempts": 0,
           "passes": false
         }

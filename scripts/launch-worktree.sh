@@ -36,7 +36,7 @@ fi
 # Mark task as in_progress (FILE-LOCKED to prevent race with parallel worktrees)
 (
   flock -w 10 200 || { echo "WARN: Could not acquire lock for phase-plan.json"; exit 1; }
-  jq --arg id "$TASK_ID" '(.phases[].stories[]? | select(.id == $id)) |= (.status = "in_progress")' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
+  jq --arg id "$TASK_ID" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "in_progress")' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
 ) 200>"$LOCK_FILE"
 
 # Calculate run number (also locked to prevent parallel collision)

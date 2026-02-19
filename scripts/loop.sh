@@ -79,7 +79,7 @@ for ITERATION in $(seq 1 "$MAX_ITERATIONS"); do
 
   # Check if task is marked dev_complete (locked read to prevent race)
   TASK_STATUS=$(
-    flock -w 10 "$LOCK_FILE" jq -r --arg id "$TASK_ID" '.phases[].stories[]? | select(.id == $id) | .status' phase-plan.json 2>/dev/null || echo "unknown"
+    flock -w 10 "$LOCK_FILE" jq -r --arg id "$TASK_ID" '.phases[].tasks[]? | select(.id == $id) | .status' phase-plan.json 2>/dev/null || echo "unknown"
   )
   
   if [ "$TASK_STATUS" = "dev_complete" ]; then
@@ -95,7 +95,7 @@ for ITERATION in $(seq 1 "$MAX_ITERATIONS"); do
       # Reset status back to in_progress (locked write)
       (
         flock -w 10 200
-        jq --arg id "$TASK_ID" '(.phases[].stories[]? | select(.id == $id)) |= (.status = "in_progress")' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
+        jq --arg id "$TASK_ID" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "in_progress")' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
       ) 200>"$LOCK_FILE"
       # Continue loop
     fi
@@ -106,7 +106,7 @@ for ITERATION in $(seq 1 "$MAX_ITERATIONS"); do
     echo "⚠ Max iterations reached for ${TASK_ID}"
     (
       flock -w 10 200
-      jq --arg id "$TASK_ID" '(.phases[].stories[]? | select(.id == $id)) |= (.status = "blocked" | .attempts += 1)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
+      jq --arg id "$TASK_ID" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "blocked" | .attempts += 1)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
     ) 200>"$LOCK_FILE"
     # Snapshot the failed run
     bash scripts/snapshot-run.sh "$RUN_NUM" "$TASK_ID" "$PROMPT" "$LOG_FILE" "1" "$START_TIME" "$ITERATION" 2>/dev/null || true

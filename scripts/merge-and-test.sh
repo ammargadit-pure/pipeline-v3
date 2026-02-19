@@ -19,7 +19,7 @@ if [ $MERGE_EXIT -ne 0 ]; then
   git merge --abort 2>/dev/null || true
   (
     flock -w 10 200
-    jq --arg id "$TASK_ID" '(.phases[].stories[]? | select(.id == $id)) |= (.status = "failed")' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
+    jq --arg id "$TASK_ID" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "failed")' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
   ) 200>/tmp/pipeline-plan.lock
   exit 1
 fi
@@ -40,7 +40,7 @@ if bash scripts/validate.sh 2>&1; then
       git revert HEAD --no-edit 2>/dev/null || true
       (
         flock -w 10 200
-        jq --arg id "$TASK_ID" '(.phases[].stories[]? | select(.id == $id)) |= (.status = "failed" | .attempts += 1)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
+        jq --arg id "$TASK_ID" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "failed" | .attempts += 1)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
       ) 200>/tmp/pipeline-plan.lock
       exit 1
     fi
@@ -53,7 +53,7 @@ if bash scripts/validate.sh 2>&1; then
   RESOLVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   (
     flock -w 10 200
-    jq --arg id "$TASK_ID" --arg ts "$RESOLVED_AT" '(.phases[].stories[]? | select(.id == $id)) |= (.status = "complete" | .passes = true | .resolved_at = $ts)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
+    jq --arg id "$TASK_ID" --arg ts "$RESOLVED_AT" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "complete" | .passes = true | .resolved_at = $ts)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
   ) 200>/tmp/pipeline-plan.lock
   
   # Write test report
@@ -71,7 +71,7 @@ else
   git revert HEAD --no-edit 2>/dev/null || true
   (
     flock -w 10 200
-    jq --arg id "$TASK_ID" '(.phases[].stories[]? | select(.id == $id)) |= (.status = "failed" | .attempts += 1)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
+    jq --arg id "$TASK_ID" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "failed" | .attempts += 1)' phase-plan.json > tmp-${TASK_ID}.json && mv tmp-${TASK_ID}.json phase-plan.json
   ) 200>/tmp/pipeline-plan.lock
   exit 1
 fi

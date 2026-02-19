@@ -16,7 +16,7 @@ git checkout main 2>/dev/null || true
 find_eligible_tasks() {
   # Find pending tasks whose blockedBy are all complete
   jq -r '
-    [.phases[].stories[]] as $all |
+    [.phases[].tasks[]] as $all |
     $all[] |
     select(.status == "pending") |
     select(
@@ -28,13 +28,13 @@ find_eligible_tasks() {
 }
 
 find_dev_complete_tasks() {
-  jq -r '.phases[].stories[] | select(.status == "dev_complete") | .id' "$PLAN_FILE"
+  jq -r '.phases[].tasks[] | select(.status == "dev_complete") | .id' "$PLAN_FILE"
 }
 
 for iteration in $(seq 1 "$MAX_ITERATIONS"); do
-  TOTAL=$(jq '[.phases[].stories[]] | length' "$PLAN_FILE")
-  DONE=$(jq '[.phases[].stories[] | select(.status == "complete")] | length' "$PLAN_FILE")
-  BLOCKED=$(jq '[.phases[].stories[] | select(.status == "blocked")] | length' "$PLAN_FILE")
+  TOTAL=$(jq '[.phases[].tasks[]] | length' "$PLAN_FILE")
+  DONE=$(jq '[.phases[].tasks[] | select(.status == "complete")] | length' "$PLAN_FILE")
+  BLOCKED=$(jq '[.phases[].tasks[] | select(.status == "blocked")] | length' "$PLAN_FILE")
   
   echo ""
   echo "═══ Iteration ${iteration}/${MAX_ITERATIONS} [${DONE}/${TOTAL} complete, ${BLOCKED} blocked] ═══"
@@ -49,7 +49,7 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
   fi
 
   # CIRCUIT BREAKER: Stop new development if too many failures
-  FAILED_COUNT=$(jq '[.phases[].stories[] | select(.status == "failed")] | length' "$PLAN_FILE")
+  FAILED_COUNT=$(jq '[.phases[].tasks[] | select(.status == "failed")] | length' "$PLAN_FILE")
   
   if [ "$FAILED_COUNT" -gt 0 ]; then
     FAIL_RATIO=$((FAILED_COUNT * 100 / TOTAL))
@@ -57,7 +57,7 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
     # Check consecutive failures using resolved_at timestamp (set by merge-and-test.sh)
     # Falls back to JSON position if timestamps not present
     CONSECUTIVE_FAILS=$(jq -r '
-      [.phases[].stories[] | select(.status == "failed" or .status == "complete") | select(.resolved_at != null)]
+      [.phases[].tasks[] | select(.status == "failed" or .status == "complete") | select(.resolved_at != null)]
       | sort_by(.resolved_at)
       | .[-3:]
       | [.[] | select(.status == "failed")]
@@ -77,7 +77,7 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
       echo "   Consecutive failures: ${CONSECUTIVE_FAILS}"
       echo ""
       echo "   Failed tasks:"
-      jq -r '.phases[].stories[] | select(.status == "failed") | "     ❌ \(.id): \(.title) (attempts: \(.attempts))"' "$PLAN_FILE"
+      jq -r '.phases[].tasks[] | select(.status == "failed") | "     ❌ \(.id): \(.title) (attempts: \(.attempts))"' "$PLAN_FILE"
       echo ""
       echo "   STOPPING new development to prevent cascading failures."
       echo "   Fix the failures before continuing."
@@ -97,7 +97,7 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
   ELIGIBLE=$(find_eligible_tasks)
   if [ -z "$ELIGIBLE" ] && [ -z "$DEV_COMPLETE" ]; then
     # Check if all done
-    REMAINING=$(jq '[.phases[].stories[] | select(.status != "complete" and .status != "blocked")] | length' "$PLAN_FILE")
+    REMAINING=$(jq '[.phases[].tasks[] | select(.status != "complete" and .status != "blocked")] | length' "$PLAN_FILE")
     if [ "$REMAINING" -eq 0 ]; then
       echo "✅ ALL TASKS COMPLETE (or blocked)"
       break
@@ -128,7 +128,7 @@ done
 
 echo ""
 echo "═══ FINAL STATUS ═══"
-jq -r '.phases[].stories[] | "\(.status | ascii_upcase)\t\(.id)\t\(.title)"' "$PLAN_FILE"
+jq -r '.phases[].tasks[] | "\(.status | ascii_upcase)\t\(.id)\t\(.title)"' "$PLAN_FILE"
 echo ""
 echo "Git history:"
 git log --oneline -20
