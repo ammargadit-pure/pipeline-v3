@@ -40,7 +40,7 @@
           "title": "Write test fixture config files and manifests",
           "description": "Create all test fixture JSON files referenced in shared-contracts.md §15 and §16:\n\n1. tests/fixtures/configs/test_master.json — Master config using TEST_ constants:\n   - master.listen_unix = '/tmp/ota-test/master.sock'\n   - master.listen_tcp = '127.0.0.1:19735'\n   - master.db_path = '/tmp/ota-test/master.db'\n   - master.download_dir = '/tmp/ota-test/downloads'\n   - master.trusted_pubkey_path = 'tests/fixtures/keys/test_public.pem'\n   - cloud.base_url = 'http://127.0.0.1:18080/api/v1'\n   - policy.health_monitoring_cycles = 2\n   - policy.error_threshold_percent = 50\n   - policy.transfer_chunk_size = 4096\n   See shared-contracts.md §14 for all keys.\n\n2. tests/fixtures/configs/test_agent.json — Agent config:\n   - agent.node_identifier = 'hpc-primary-001'\n   - agent.install_base_dir = '/tmp/ota-test/opt'\n   - master.address = '/tmp/ota-test/master.sock'\n   - master.transport = 'unix'\n   - bootloader.plugin = 'sim'\n   See shared-contracts.md §14 and §16 for all test values.\n\n3. tests/fixtures/manifests/valid_sw_manifest.json — SW manifest:\n   - package_identifier = 'nav-service', version = '2.2.0', artifact_type = 'software'\n   - node_identifier = 'hpc-primary', targeted_region = 'EU'\n   - min/max OS and SDK versions per shared-contracts.md §7\n\n4. tests/fixtures/manifests/valid_fw_manifest.json — FW manifest:\n   - package_identifier = 'sensor-fw', version = '1.4.0', artifact_type = 'firmware'\n   - node_identifier = 'mcu-sensor'\n\n5. tests/fixtures/manifests/incompatible_manifest.json:\n   - node_identifier = 'nonexistent-node'\n\nVerification: All files exist and are valid JSON (python3 -m json.tool < file).\nSee shared-contracts.md §16 for all test data constants.",
           "skill": "develop",
-          "status": "complete",
+          "status": "dev_complete",
           "blockedBy": [],
           "attempts": 0,
           "passes": true
@@ -77,7 +77,7 @@
           ],
           "attempts": 3,
           "passes": true,
-          "resolved_at": "2026-02-19T23:13:53Z"
+          "resolved_at": "2026-02-19T23:39:20Z"
         }
       ]
     },
@@ -90,7 +90,7 @@
           "title": "Build bootloader plugin interface + sim plugin + factory",
           "description": "Create the bootloader plugin layer that both Linux and FreeRTOS agents depend on.\n\nFiles to create:\n\n1. src/libota-core/include/ota/bootloader/interface.h — Already created in found-001. Verify it matches shared-contracts.md §11 EXACTLY.\n\n2. src/ota-agent/bootloader/plugin_factory.hpp + plugin_factory.cpp:\n   - namespace ota::agent\n   - ota_bootloader_create(plugin_name, config_json) → allocates and returns plugin\n   - ota_bootloader_destroy(iface) → frees plugin\n   - Supports plugin names: 'sim', 'linux-generic' (shared-contracts.md §11 constants)\n   - Unknown plugin → returns nullptr\n\n3. src/ota-agent/bootloader/sim_plugin.cpp:\n   - Simulates A/B flash slots using temp files\n   - detect_inactive_slot: returns slot_b if slot_a active (and vice versa)\n   - stage_firmware: writes data to file at offset\n   - prepare_activation: marks staged slot as pending\n   - query_boot_status: returns both slots' states\n   - mark_active_valid: clears pending_activation\n   - mark_slot_invalid: sets is_valid=false on specified slot\n   - Context struct holds file paths for slot_a and slot_b (from config_json)\n\n4. src/ota-agent/bootloader/linux_generic_plugin.cpp:\n   - Similar to sim but uses partition metadata files\n   - For x86 dev: reads/writes JSON metadata files (simulating UBoot env vars)\n\n5. src/ota-agent/CMakeLists.txt — Add bootloader sources, create bootloader sub-target or include in agent build\n\n6. tests/unit/bootloader/CMakeLists.txt — unit_bootloader_tests executable\n\nAcceptance criteria:\n   cmake --build build --target ota-agent -j$(nproc)  → compiles (may not fully link yet, bootloader is a sub-component)\n   Bootloader plugin files compile without errors\n\nREFERENCE: shared-contracts.md §11 for interface, plugin names, factory signatures.\nREFERENCE: tech-spec.md §9 for bootloader plugin interface.\nREFERENCE: tech-spec.md §6 for bootloader config keys (agent.bootloader.plugin, agent.bootloader.config).",
           "skill": "develop",
-          "status": "pending",
+          "status": "dev_complete",
           "blockedBy": [
             "test-found-001"
           ],
