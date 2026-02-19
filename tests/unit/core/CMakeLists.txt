@@ -5,6 +5,7 @@ add_executable(unit_core_tests
     test_state.cpp
     test_version.cpp
     test_crypto.cpp
+    test_persistence.cpp
 )
 
 target_link_libraries(unit_core_tests
