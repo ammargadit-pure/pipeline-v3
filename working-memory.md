@@ -34,3 +34,4 @@
 ## Iteration Log
 - found-001 completed: CMake scaffold + full libota-core (7 source files, 9 headers, 12 passing tests)
 - test-found-001 completed: 68 comprehensive unit tests for all 7 libota-core modules — ALL PASS, zero warnings
+- test-found-001 validation: clang-tidy exits 0 (only clang-analyzer DeprecatedOrUnsafeBufferHandling warnings for standard C functions — expected in C11 code)
