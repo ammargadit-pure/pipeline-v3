@@ -76,6 +76,12 @@ else
   exit 1
 fi
 
+# Preserve runs/ folder before cleanup
+if [ -d "$WORKTREE_DIR/runs" ]; then
+  mkdir -p runs
+  cp -r "$WORKTREE_DIR/runs/"* runs/ 2>/dev/null || true
+fi
+
 # Cleanup worktree
 git worktree remove "$WORKTREE_DIR" 2>/dev/null || true
 git branch -d "$TASK_ID" 2>/dev/null || true
