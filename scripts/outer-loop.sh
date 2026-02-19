@@ -21,12 +21,13 @@ git checkout main 2>/dev/null || true
 find_eligible_tasks() {
   # Find pending tasks whose blockedBy are all complete
   jq -r '
-    [.phases[].tasks[]] as $all |
-    $all[] |
+    [.phases[].tasks[] | {id, status}] as $statuses |
+    .phases[].tasks[] |
     select(.status == "pending") |
+    . as $task |
     select(
-      (.blockedBy // []) | length == 0 or
-      ((.blockedBy // []) | all(. as $dep | $all[] | select(.id == $dep) | .status == "complete"))
+      ($task.blockedBy | length) == 0 or
+      ([$task.blockedBy[] | . as $dep | $statuses[] | select(.id == $dep and .status == "complete")] | length) == ($task.blockedBy | length)
     ) |
     "\(.id)|\(.skill)"
   ' "$PLAN_FILE"
