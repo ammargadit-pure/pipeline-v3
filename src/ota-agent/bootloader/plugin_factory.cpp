@@ -41,9 +41,8 @@ void PluginFactory::destroy(ota_bootloader_interface_t *iface) {
 
 } // namespace ota::agent
 
-/* C-linkage factory functions declared in ota/bootloader/interface.h */
-extern "C" {
-
+/* C-linkage factory functions declared in ota/bootloader/interface.h.
+ * The header wraps these with extern "C" via __cplusplus guards. */
 ota_bootloader_interface_t *ota_bootloader_create(const char *plugin_name,
                                                     const char *config_json) {
     return ota::agent::PluginFactory::create(plugin_name, config_json);
@@ -52,5 +51,3 @@ ota_bootloader_interface_t *ota_bootloader_create(const char *plugin_name,
 void ota_bootloader_destroy(ota_bootloader_interface_t *iface) {
     ota::agent::PluginFactory::destroy(iface);
 }
-
-} /* extern "C" */
