@@ -42,7 +42,7 @@ fi
 # Calculate run number (also locked to prevent parallel collision)
 (
   flock -w 10 200 || true
-  RUN_NUM=$(( $(ls -d runs/???-* 2>/dev/null | wc -l) + 1 ))
+  RUN_NUM=$(( $( (ls -d runs/???-* 2>/dev/null || true) | wc -l) + 1 ))
   echo "$RUN_NUM" > "/tmp/pipeline-run-${TASK_ID}.num"
 ) 200>"$LOCK_FILE"
 RUN_NUM=$(cat "/tmp/pipeline-run-${TASK_ID}.num" 2>/dev/null || echo "1")
