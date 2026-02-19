@@ -56,14 +56,14 @@
           "title": "Build CMake project scaffold + complete libota-core library",
           "description": "Create the entire build system and the libota-core shared library.\n\nFiles to create:\n\n1. Root CMakeLists.txt:\n   - cmake_minimum_required(VERSION 3.20)\n   - project(ota-system LANGUAGES C CXX)\n   - C standard 11, CXX standard 17\n   - FetchContent for: GoogleTest, nlohmann-json, cJSON, spdlog\n   - Options: OTA_BUILD_TESTS, OTA_BUILD_MOCK_CLOUD, OTA_COVERAGE\n   - add_subdirectory for each src/ component\n   - Conditional test directory inclusion\n\n2. cmake/CompilerFlags.cmake:\n   - -Wall -Wextra -Werror -Wpedantic\n   - -fsanitize=address,undefined for Debug builds\n\n3. cmake/Dependencies.cmake:\n   - FetchContent_Declare for GoogleTest 1.13+, nlohmann-json 3.11+, cJSON 1.7+, spdlog 1.11+\n\n4. cmake/Testing.cmake:\n   - enable_testing(), CTest configuration\n   - Coverage flags if OTA_COVERAGE=ON\n\n5. src/libota-core/CMakeLists.txt:\n   - Static library target 'ota-core'\n   - Include directory: include/\n   - Link: OpenSSL::SSL OpenSSL::Crypto, cJSON\n   - Install headers under ota/core/ and ota/bootloader/\n\n6. ALL headers in src/libota-core/include/ota/core/:\n   - types.h — EXACT content from shared-contracts.md §3\n   - error.h — EXACT content from shared-contracts.md §4\n   - protocol.h — EXACT content from shared-contracts.md §5\n   - state.h — EXACT content from shared-contracts.md §6\n   - manifest.h — EXACT content from shared-contracts.md §7\n   - version.h — EXACT content from shared-contracts.md §8\n   - crypto.h — EXACT content from shared-contracts.md §9\n   - persistence.h — EXACT content from shared-contracts.md §10\n\n7. Header in src/libota-core/include/ota/bootloader/:\n   - interface.h — EXACT content from shared-contracts.md §11\n\n8. ALL source files in src/libota-core/src/:\n   - error.c — ota_error_str() switch for ALL enum values, range check inlines\n   - manifest.c — parse (cJSON), validate, serialize, free\n   - protocol.c — header serialize/deserialize (htons/htonl), validate, msg_is_binary, msg_type_str\n   - state.c — ALL str/from_str functions, can_transition lookup tables\n   - version.c — parse MAJOR.MINOR.PATCH, compare, in_range, to_str\n   - crypto_openssl.c — CRC32 (zlib polynomial), SHA-256 (EVP API), ECDSA P-256 sign/verify (EVP_DigestSign/Verify)\n   - persistence.c — atomic_write (write tmp, fsync, rename), read_file, file_exists, mkdir_p\n\n9. Test scaffolding:\n   - tests/unit/core/CMakeLists.txt — unit_core_tests executable linking ota-core + GTest\n   - Stub test files (test_error.cpp, test_manifest.cpp, etc.) — just enough to compile+link\n\nAcceptance criteria:\n   cmake -B build -DCMAKE_BUILD_TYPE=Debug -DOTA_BUILD_TESTS=ON\n   cmake --build build --target ota-core -j$(nproc)  → EXIT 0, zero warnings\n   test -f build/src/libota-core/libota-core.a\n   All headers compilable with: gcc -c test.c -I src/libota-core/include\n\nREFERENCE: shared-contracts.md §§2-11 for every identifier, type, and function signature.\nREFERENCE: tech-spec.md §§1,2,7 for file structure and error codes.\nREFERENCE: verification-plan.md 'Module: libota-core' for build verification commands.",
           "skill": "develop",
-          "status": "pending",
+          "status": "dev_complete",
           "blockedBy": [
             "infra-001",
             "infra-002",
             "infra-003"
           ],
-          "attempts": 0,
-          "passes": false
+          "attempts": 1,
+          "passes": true
         },
         {
           "id": "test-found-001",

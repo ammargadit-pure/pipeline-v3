@@ -1,0 +1,28 @@
+{
+    "master": {
+        "listen_unix": "/tmp/ota-test/master.sock",
+        "listen_tcp": "127.0.0.1:19735",
+        "db_path": "/tmp/ota-test/master.db",
+        "download_dir": "/tmp/ota-test/downloads",
+        "trusted_pubkey_path": "tests/fixtures/keys/test_public.pem",
+        "log_level": "debug",
+        "log_file": "/tmp/ota-test/log/master.log"
+    },
+    "cloud": {
+        "base_url": "http://127.0.0.1:18080/api/v1",
+        "timeout_seconds": 10,
+        "retry_count": 3
+    },
+    "policy": {
+        "check_on_ignition": true,
+        "allowed_network_types": ["wifi", "ethernet"],
+        "bandwidth_limit_kbps": 0,
+        "require_safe_state_for_activation": true,
+        "safe_states": ["parked", "short_parking"],
+        "health_monitoring_cycles": 2,
+        "error_threshold_percent": 50,
+        "transfer_retry_count": 3,
+        "transfer_chunk_size": 4096,
+        "version_supersede_policy": "supersede"
+    }
+}
