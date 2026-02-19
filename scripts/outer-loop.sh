@@ -141,6 +141,23 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
   # Wait for all background worktree jobs to finish
   wait
 
+  # Sync dev_complete status from worktrees to main
+  for wt in ../wt-*; do
+    [ -d "$wt" ] || continue
+    wt_task=$(basename "$wt" | sed 's/^wt-//')
+    wt_status=$(jq -r --arg id "$wt_task" '.phases[].tasks[]? | select(.id == $id) | .status' "$wt/phase-plan.json" 2>/dev/null || echo "")
+    if [ "$wt_status" = "dev_complete" ]; then
+      main_status=$(jq -r --arg id "$wt_task" '.phases[].tasks[]? | select(.id == $id) | .status' "$PLAN_FILE")
+      if [ "$main_status" != "dev_complete" ]; then
+        echo "→ Syncing status: ${wt_task} = dev_complete"
+        (
+          flock -w 10 200
+          jq --arg id "$wt_task" '(.phases[].tasks[]? | select(.id == $id)) |= (.status = "dev_complete")' "$PLAN_FILE" > tmp-sync.json && mv tmp-sync.json "$PLAN_FILE"
+        ) 200>/tmp/pipeline-plan.lock
+      fi
+    fi
+  done
+
   sleep 2
 done
 
