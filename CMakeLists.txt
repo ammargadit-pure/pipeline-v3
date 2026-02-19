@@ -22,6 +22,7 @@ endif()
 
 # Source directories
 add_subdirectory(src/libota-core)
+add_subdirectory(src/ota-agent)
 
 # Tests
 if(OTA_BUILD_TESTS)

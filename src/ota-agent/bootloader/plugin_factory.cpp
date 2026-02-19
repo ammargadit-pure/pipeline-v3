@@ -28,16 +28,15 @@ void PluginFactory::destroy(ota_bootloader_interface_t *iface) {
         return;
     }
 
-    /* Free the context based on plugin type */
-    if (iface->ctx) {
-        if (iface->name && std::strcmp(iface->name, OTA_BOOTLOADER_PLUGIN_SIM) == 0) {
-            delete static_cast<struct SimPluginCtx *>(iface->ctx);
-        } else if (iface->name && std::strcmp(iface->name, OTA_BOOTLOADER_PLUGIN_LINUX_GENERIC) == 0) {
-            delete static_cast<struct LinuxGenericCtx *>(iface->ctx);
-        }
+    /* Delegate destruction to the specific plugin's destroy function */
+    if (iface->name && std::strcmp(iface->name, OTA_BOOTLOADER_PLUGIN_SIM) == 0) {
+        destroy_sim_plugin(iface);
+    } else if (iface->name && std::strcmp(iface->name, OTA_BOOTLOADER_PLUGIN_LINUX_GENERIC) == 0) {
+        destroy_linux_generic_plugin(iface);
+    } else {
+        /* Unknown plugin — best effort cleanup */
+        delete iface;
     }
-
-    delete iface;
 }
 
 } // namespace ota::agent
