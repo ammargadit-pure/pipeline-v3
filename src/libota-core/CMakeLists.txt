@@ -11,6 +11,8 @@ add_library(ota-core STATIC
 target_include_directories(ota-core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${cjson_SOURCE_DIR}
 )
 
 target_link_libraries(ota-core
