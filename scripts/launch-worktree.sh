@@ -19,6 +19,7 @@ git worktree add "$WORKTREE_DIR" -b "$TASK_ID" 2>/dev/null || {
 
 # Copy env files if they exist
 [ -f .env ] && cp .env "$WORKTREE_DIR/.env" 2>/dev/null || true
+[ -f .pipeline.env ] && cp .pipeline.env "$WORKTREE_DIR/.pipeline.env" 2>/dev/null || true
 
 # Install deps in worktree — FAIL LOUDLY if install fails
 cd "$WORKTREE_DIR"
