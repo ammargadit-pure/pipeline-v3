@@ -17,4 +17,5 @@ target_link_libraries(unit_core_tests
 include(GoogleTest)
 gtest_discover_tests(unit_core_tests
     TEST_PREFIX "unit_core_"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
 )
