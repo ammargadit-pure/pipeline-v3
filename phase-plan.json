@@ -40,10 +40,10 @@
           "title": "Write test fixture config files and manifests",
           "description": "Create all test fixture JSON files referenced in shared-contracts.md §15 and §16:\n\n1. tests/fixtures/configs/test_master.json — Master config using TEST_ constants:\n   - master.listen_unix = '/tmp/ota-test/master.sock'\n   - master.listen_tcp = '127.0.0.1:19735'\n   - master.db_path = '/tmp/ota-test/master.db'\n   - master.download_dir = '/tmp/ota-test/downloads'\n   - master.trusted_pubkey_path = 'tests/fixtures/keys/test_public.pem'\n   - cloud.base_url = 'http://127.0.0.1:18080/api/v1'\n   - policy.health_monitoring_cycles = 2\n   - policy.error_threshold_percent = 50\n   - policy.transfer_chunk_size = 4096\n   See shared-contracts.md §14 for all keys.\n\n2. tests/fixtures/configs/test_agent.json — Agent config:\n   - agent.node_identifier = 'hpc-primary-001'\n   - agent.install_base_dir = '/tmp/ota-test/opt'\n   - master.address = '/tmp/ota-test/master.sock'\n   - master.transport = 'unix'\n   - bootloader.plugin = 'sim'\n   See shared-contracts.md §14 and §16 for all test values.\n\n3. tests/fixtures/manifests/valid_sw_manifest.json — SW manifest:\n   - package_identifier = 'nav-service', version = '2.2.0', artifact_type = 'software'\n   - node_identifier = 'hpc-primary', targeted_region = 'EU'\n   - min/max OS and SDK versions per shared-contracts.md §7\n\n4. tests/fixtures/manifests/valid_fw_manifest.json — FW manifest:\n   - package_identifier = 'sensor-fw', version = '1.4.0', artifact_type = 'firmware'\n   - node_identifier = 'mcu-sensor'\n\n5. tests/fixtures/manifests/incompatible_manifest.json:\n   - node_identifier = 'nonexistent-node'\n\nVerification: All files exist and are valid JSON (python3 -m json.tool < file).\nSee shared-contracts.md §16 for all test data constants.",
           "skill": "develop",
-          "status": "pending",
+          "status": "complete",
           "blockedBy": [],
           "attempts": 0,
-          "passes": false
+          "passes": true
         }
       ]
     },
