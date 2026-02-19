@@ -3,11 +3,16 @@ set -euo pipefail
 
 MAX_ITERATIONS="${1:-30}"
 MAX_PARALLEL="${2:-3}"
+MAX_TASKS="${3:-0}"  # 0 = unlimited, N = stop after N tasks complete
 PLAN_FILE="phase-plan.json"
+
+# Track how many tasks we've completed this run
+TASKS_COMPLETED_THIS_RUN=0
+INITIAL_DONE=$(jq '[.phases[].tasks[] | select(.status == "complete")] | length' "$PLAN_FILE")
 
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║  Pipeline v3 — Build→Test→Judge with Worktree Isolation    ║"
-echo "║  Max iterations: ${MAX_ITERATIONS}  |  Max parallel: ${MAX_PARALLEL}            ║"
+echo "║  Max iterations: ${MAX_ITERATIONS}  |  Max parallel: ${MAX_PARALLEL}  |  Max tasks: ${MAX_TASKS:-unlimited}  ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 
 # Ensure we're on main
@@ -46,6 +51,18 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
       echo "→ Merging + testing: ${task_id}"
       bash scripts/merge-and-test.sh "$task_id" || true
     done <<< "$DEV_COMPLETE"
+  fi
+
+  # Check if we've hit the MAX_TASKS limit
+  if [ "$MAX_TASKS" -gt 0 ]; then
+    CURRENT_DONE=$(jq '[.phases[].tasks[] | select(.status == "complete")] | length' "$PLAN_FILE")
+    TASKS_COMPLETED_THIS_RUN=$((CURRENT_DONE - INITIAL_DONE))
+    if [ "$TASKS_COMPLETED_THIS_RUN" -ge "$MAX_TASKS" ]; then
+      echo ""
+      echo "✅ MAX_TASKS limit reached: completed ${TASKS_COMPLETED_THIS_RUN} task(s) this run"
+      echo "   Run again to continue with more tasks."
+      break
+    fi
   fi
 
   # CIRCUIT BREAKER: Stop new development if too many failures
