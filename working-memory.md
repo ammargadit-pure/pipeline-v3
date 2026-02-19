@@ -31,8 +31,20 @@
 - WORKING_DIRECTORY set to CMAKE_SOURCE_DIR so test key paths resolve relative to project root
 - ECDSA tests generate temp keypairs via system("openssl ...") for wrong-key verification tests
 
+## Bootloader Plugin Insights
+- ota-agent-bootloader is a STATIC library (separate from the agent executable) so tests can link against it independently
+- Sim plugin stores A/B slot state in memory (SimPluginCtx struct), writes firmware data to files
+- Linux-generic plugin persists all state to boot_metadata.json (read/write each operation), more realistic for testing persistence
+- cJSON used in both C++ plugins for config parsing and metadata persistence — link cjson PRIVATE
+- Plugin factory implements both C++ PluginFactory class AND C-linkage ota_bootloader_create/destroy functions
+- Test fixtures use /tmp/ota-test/bootloader-* dirs, cleaned in setUp/tearDown via system("rm -rf ...")
+- 30 bootloader tests: sim(11), factory(8), linux-generic(11) — all pass with >= 2 assertions each
+
 ## Iteration Log
 - found-001 completed: CMake scaffold + full libota-core (7 source files, 9 headers, 12 passing tests)
 - test-found-001 completed: 68 comprehensive unit tests for all 7 libota-core modules — ALL PASS, zero warnings
 - test-found-001 validation: clang-tidy exits 0 (only clang-analyzer DeprecatedOrUnsafeBufferHandling warnings for standard C functions — expected in C11 code)
 - test-found-001 status: dev_complete — quality gate satisfied, downstream tasks unblocked
+- build-001 completed: bootloader plugin layer (sim + linux-generic + factory) with 30 unit tests — ALL PASS
+- build-001 validation: cmake build=0, clang-tidy=0, ctest 98/98 pass (68 core + 30 bootloader)
+- build-001 status: dev_complete — unblocks test-001, build-007, build-008

@@ -4,6 +4,10 @@
 #include "ota/core/types.h"
 #include "ota/core/error.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Slot identifier */
 typedef struct {
     uint8_t  slot_index;                     /* 0 = A (primary), 1 = B (secondary) */
@@ -43,5 +47,9 @@ typedef struct ota_bootloader_interface {
 ota_bootloader_interface_t *ota_bootloader_create(const char *plugin_name,
                                                    const char *config_json);
 void ota_bootloader_destroy(ota_bootloader_interface_t *iface);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* OTA_BOOTLOADER_INTERFACE_H */

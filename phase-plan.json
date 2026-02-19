@@ -94,8 +94,9 @@
           "blockedBy": [
             "test-found-001"
           ],
-          "attempts": 0,
-          "passes": false
+          "attempts": 1,
+          "passes": true,
+          "resolved_at": "2026-02-20T05:00:00Z"
         },
         {
           "id": "test-001",
