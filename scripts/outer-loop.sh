@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MAX_ITERATIONS="${1:-30}"
+MAX_PARALLEL="${2:-3}"
+PLAN_FILE="phase-plan.json"
+
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║  Pipeline v3 — Build→Test→Judge with Worktree Isolation    ║"
+echo "║  Max iterations: ${MAX_ITERATIONS}  |  Max parallel: ${MAX_PARALLEL}            ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+
+# Ensure we're on main
+git checkout main 2>/dev/null || true
+
+find_eligible_tasks() {
+  # Find pending tasks whose blockedBy are all complete
+  jq -r '
+    [.phases[].stories[]] as $all |
+    $all[] |
+    select(.status == "pending") |
+    select(
+      (.blockedBy // []) | length == 0 or
+      ((.blockedBy // []) | all(. as $dep | $all[] | select(.id == $dep) | .status == "complete"))
+    ) |
+    "\(.id)|\(.skill)"
+  ' "$PLAN_FILE"
+}
+
+find_dev_complete_tasks() {
+  jq -r '.phases[].stories[] | select(.status == "dev_complete") | .id' "$PLAN_FILE"
+}
+
+for iteration in $(seq 1 "$MAX_ITERATIONS"); do
+  TOTAL=$(jq '[.phases[].stories[]] | length' "$PLAN_FILE")
+  DONE=$(jq '[.phases[].stories[] | select(.status == "complete")] | length' "$PLAN_FILE")
+  BLOCKED=$(jq '[.phases[].stories[] | select(.status == "blocked")] | length' "$PLAN_FILE")
+  
+  echo ""
+  echo "═══ Iteration ${iteration}/${MAX_ITERATIONS} [${DONE}/${TOTAL} complete, ${BLOCKED} blocked] ═══"
+
+  # Step 1: Merge + test any dev_complete tasks
+  DEV_COMPLETE=$(find_dev_complete_tasks)
+  if [ -n "$DEV_COMPLETE" ]; then
+    while IFS= read -r task_id; do
+      echo "→ Merging + testing: ${task_id}"
+      bash scripts/merge-and-test.sh "$task_id" || true
+    done <<< "$DEV_COMPLETE"
+  fi
+
+  # CIRCUIT BREAKER: Stop new development if too many failures
+  FAILED_COUNT=$(jq '[.phases[].stories[] | select(.status == "failed")] | length' "$PLAN_FILE")
+  
+  if [ "$FAILED_COUNT" -gt 0 ]; then
+    FAIL_RATIO=$((FAILED_COUNT * 100 / TOTAL))
+    
+    # Check consecutive failures using resolved_at timestamp (set by merge-and-test.sh)
+    # Falls back to JSON position if timestamps not present
+    CONSECUTIVE_FAILS=$(jq -r '
+      [.phases[].stories[] | select(.status == "failed" or .status == "complete") | select(.resolved_at != null)]
+      | sort_by(.resolved_at)
+      | .[-3:]
+      | [.[] | select(.status == "failed")]
+      | length
+    ' "$PLAN_FILE" 2>/dev/null || echo "0")
+    
+    # Fallback: if no resolved_at timestamps yet, use simple count
+    if [ "$CONSECUTIVE_FAILS" = "0" ] && [ "$FAILED_COUNT" -ge 3 ]; then
+      CONSECUTIVE_FAILS="$FAILED_COUNT"
+    fi
+    
+    # Big failure = 30%+ tasks failed OR 3 consecutive failures
+    if [ "$FAIL_RATIO" -ge 30 ] || [ "$CONSECUTIVE_FAILS" -ge 3 ]; then
+      echo ""
+      echo "🛑 CIRCUIT BREAKER TRIPPED"
+      echo "   Failed: ${FAILED_COUNT} tasks (${FAIL_RATIO}% of ${TOTAL})"
+      echo "   Consecutive failures: ${CONSECUTIVE_FAILS}"
+      echo ""
+      echo "   Failed tasks:"
+      jq -r '.phases[].stories[] | select(.status == "failed") | "     ❌ \(.id): \(.title) (attempts: \(.attempts))"' "$PLAN_FILE"
+      echo ""
+      echo "   STOPPING new development to prevent cascading failures."
+      echo "   Fix the failures before continuing."
+      echo ""
+      echo "   To investigate:"
+      echo "     cat docs/test-reports/{task-id}.md"
+      echo "     ls runs/                               # see run snapshots"
+      echo "     cat runs/{run}/output.log              # see agent output"
+      echo "     cat runs/{run}/diff.patch              # see what changed"
+      echo ""
+      echo "   After fixing, re-run: ./scripts/outer-loop.sh"
+      break
+    fi
+  fi
+
+  # Step 2: Launch new worktrees for eligible tasks (up to MAX_PARALLEL)
+  ELIGIBLE=$(find_eligible_tasks)
+  if [ -z "$ELIGIBLE" ] && [ -z "$DEV_COMPLETE" ]; then
+    # Check if all done
+    REMAINING=$(jq '[.phases[].stories[] | select(.status != "complete" and .status != "blocked")] | length' "$PLAN_FILE")
+    if [ "$REMAINING" -eq 0 ]; then
+      echo "✅ ALL TASKS COMPLETE (or blocked)"
+      break
+    fi
+    echo "No eligible tasks. Waiting..."
+    sleep 5
+    continue
+  fi
+
+  LAUNCHED=0
+  while IFS='|' read -r task_id skill; do
+    [ -z "$task_id" ] && continue
+    [ "$LAUNCHED" -ge "$MAX_PARALLEL" ] && break
+    
+    echo "→ Launching worktree: ${task_id} (skill: ${skill})"
+    
+    # Launch in background for parallel execution
+    bash scripts/launch-worktree.sh "$task_id" "$skill" 10 &
+    
+    LAUNCHED=$((LAUNCHED + 1))
+  done <<< "$ELIGIBLE"
+
+  # Wait for all background worktree jobs to finish
+  wait
+
+  sleep 2
+done
+
+echo ""
+echo "═══ FINAL STATUS ═══"
+jq -r '.phases[].stories[] | "\(.status | ascii_upcase)\t\(.id)\t\(.title)"' "$PLAN_FILE"
+echo ""
+echo "Git history:"
+git log --oneline -20
+echo ""
+echo "Test results:"
+CMD_TEST="${CMD_TEST:-npm run test}"
+eval "$CMD_TEST" 2>&1 | tail -15 || true

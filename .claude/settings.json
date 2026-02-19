@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)", "Bash(grep:*)", "Bash(cat:*)", "Bash(ls:*)",
+      "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(jq:*)",
+      "Bash(git:*)", "Bash(mkdir:*)", "Bash(cp:*)", "Bash(mv:*)",
+      "Bash(sed:*)", "Bash(echo:*)", "Bash(chmod:*)", "Bash(curl:*)",
+      "Bash(sleep:*)", "Bash(kill:*)", "Bash(date:*)", "Bash(docker:*)",
+
+      "Bash(npm:*)", "Bash(npx:*)", "Bash(node:*)", "Bash(tsx:*)",
+      "Bash(python:*)", "Bash(pip:*)", "Bash(pytest:*)", "Bash(mypy:*)",
+      "Bash(go:*)", "Bash(cargo:*)", "Bash(rustc:*)",
+
+      "Write(src/**)", "Write(app/**)", "Write(internal/**)", "Write(cmd/**)",
+      "Write(tests/**)", "Write(test/**)", "Write(spec/**)",
+      "Write(docs/**)", "Write(runs/**)",
+      "Write(phase-plan.json)", "Write(working-memory.md)",
+      "Write(shared-contracts.md)", "Write(verification-plan.md)",
+      "Write(test-strategy.md)",
+      "Write(PRD.md)", "Write(tech-spec.md)",
+      "Write(vitest.config.ts)", "Write(tsconfig.json)", "Write(package.json)",
+      "Write(pyproject.toml)", "Write(requirements.txt)",
+      "Write(go.mod)", "Write(go.sum)",
+      "Write(Cargo.toml)", "Write(Cargo.lock)"
+    ]
+  }
+}

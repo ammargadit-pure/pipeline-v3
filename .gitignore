@@ -1,0 +1,18 @@
+# User-specific
+.pipeline.env
+.contract-hash
+.gates-hash
+
+# Runtime artifacts
+runs/
+scripts/logs/
+docs/test-reports/
+docs/judge-report.md
+build/
+node_modules/
+.venv/
+/tmp/pipeline-*.lock
+
+# Worktrees
+../wt-*/
+.pipeline.env

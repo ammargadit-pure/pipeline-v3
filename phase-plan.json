@@ -1,0 +1,14 @@
+{
+  "project": "",
+  "mission": "AWAITING_PLANNER",
+  "quality_gates": {
+    "unit_coverage_min": 80,
+    "integration_coverage_min": 70,
+    "zero_contract_violations": true,
+    "no_mocks_outside_unit": true,
+    "min_assertions_per_test": 2,
+    "no_skipped_tests": true,
+    "max_retries_per_task": 3
+  },
+  "phases": []
+}
